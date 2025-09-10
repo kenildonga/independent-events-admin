@@ -1,0 +1,32 @@
+[
+  {
+    "_id": "6891e74dae27335689654882",
+    "title": "Summer Music Festival 2025",
+    "start_date": "2025-08-15T00:00:00.000Z",
+    "end_date": "2025-08-15T00:00:00.000Z",
+    "location": "Nikol 20+",
+    "required": {
+      "boys": 5,
+      "girls": 5,
+      "any": 10
+    },
+    "isActive": true,
+    "payment": 150,
+    "createdAt": "2025-08-05T11:13:17.136Z"
+  },
+  {
+    "_id": "6891e74dae27335689654883",
+    "title": "Summer Music Festival 2026",
+    "start_date": "2025-08-15T00:00:00.000Z",
+    "end_date": "2025-08-15T00:00:00.000Z",
+    "location": "Nikol 20+",
+    "required": {
+      "boys": 15,
+      "girls": 15,
+      "any": 30
+    },
+    "isActive": true,
+    "payment": 150,
+    "createdAt": "2025-08-05T11:13:17.136Z"
+  }
+]
