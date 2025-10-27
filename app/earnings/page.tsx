@@ -9,6 +9,14 @@ import {
 
 import data from "./data.json"
 
+interface EarningsData {
+  id: number;
+  username: string;
+  type: "credit" | "debit";
+  datetime: string;
+  points: number;
+}
+
 export default function Page() {
   return (
     <SidebarProvider
@@ -26,7 +34,7 @@ export default function Page() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <SectionCards />
-              <DataTable data={data} />
+              <DataTable data={data as EarningsData[]} />
             </div>
           </div>
         </div>

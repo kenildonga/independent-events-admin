@@ -87,7 +87,7 @@ const data = {
         },
         {
           title: "Manage Tasks",
-          url: "#",
+          url: "/earnings/manage-tasks",
         },
         {
           title: "Track Task Completion",
@@ -95,7 +95,7 @@ const data = {
         },
         {
           title: "Referral Points",
-          url: "#",
+          url: "/earnings/referral-management",
         },
       ],
     },

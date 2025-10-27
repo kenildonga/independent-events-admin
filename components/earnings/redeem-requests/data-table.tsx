@@ -28,8 +28,8 @@ import {
   IconChevronsRight,
   IconLayoutColumns,
   IconPlus,
-  IconPencil,
-  IconTrash,
+  IconCheck,
+  IconX
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -46,7 +46,7 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table"
-import { date, z } from "zod"
+import { z } from "zod"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -85,7 +85,7 @@ export const schema = z.object({
   convertRate: z.number(),
   status: z.enum(["approved", "pending", "rejected"]),
   points: z.number(),
-})
+});
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
@@ -165,14 +165,14 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
           size="icon"
           className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
         >
-          <IconPencil />
+          <IconCheck />
           <span className="sr-only">Edit</span>
         </Button>
         <Button
           variant="destructive"
           size="icon"
         >
-          <IconTrash />
+          <IconX />
           <span className="sr-only">Delete</span>
         </Button>
       </div>
@@ -436,6 +436,7 @@ export function DataTable({
       onValueChange={(value) => setTabValue(value as typeof tabValue)}
       className="w-full flex-col justify-start gap-6"
     >
+
       <div className="flex items-center justify-between px-4 lg:px-6">
         <Label htmlFor="status-selector" className="sr-only">
           Status

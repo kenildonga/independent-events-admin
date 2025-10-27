@@ -1,6 +1,6 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import { DataTable } from "@/components/earnings/redeem-requests/data-table"
-import { SectionCards } from "@/components/earnings/redeem-requests/section-cards"
+import { DataTable } from "@/components/earnings/referral-management/data-table"
+import { SectionCards } from "@/components/earnings/referral-management/section-cards"
 import { SiteHeader } from "@/components/site-header"
 import {
   SidebarInset,
@@ -9,18 +9,15 @@ import {
 
 import data from "./data.json"
 
-type RedeemStatus = "all" | "approved" | "pending" | "rejected"
-
-type RedeemRow = {
-  id: number
-  username: string
-  datetime: string
-  convertRate: number
-  status: RedeemStatus
-  points: number
+type ReferralRow = {
+  _id: number
+  userName: string
+  referralCode: string
+  referredUsers: number
+  totalEarnings: number
 }
 
-const typedData = data as RedeemRow[]
+const typedData = data as unknown as ReferralRow[]
 
 export default function Page() {
   return (

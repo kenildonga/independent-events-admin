@@ -1,0 +1,26 @@
+[
+  {
+    "_id": 1,
+    "question": "Cover page",
+    "answer": "Option A",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "updatedAt": "2023-10-01T10:00:00Z",
+    "points": 50
+  },
+  {
+    "_id": 2,
+    "question": "Table of contents",
+    "answer": "Option C",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "updatedAt": "2023-10-02T11:30:00Z",
+    "points": 30
+  },
+  {
+    "_id": 3,
+    "question": "Executive summary",
+    "answer": "Option B",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "updatedAt": "2023-10-03T14:15:00Z",
+    "points": 70
+  }
+]
