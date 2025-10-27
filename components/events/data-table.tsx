@@ -29,8 +29,9 @@ import {
     IconLayoutColumns,
     IconPencil,
     IconPlus,
-    IconTrash,
-    IconReport
+    IconReport,
+    IconSearch,
+    IconTrash
 } from "@tabler/icons-react"
 import {
     ColumnDef,
@@ -50,6 +51,7 @@ import {
 import { z } from "zod"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
     DropdownMenu,
@@ -162,6 +164,7 @@ export function DataTable({
         pageSize: 10,
     })
     const [activeTab, setActiveTab] = React.useState("outline")
+    const [globalFilter, setGlobalFilter] = React.useState("")
     const sortableId = React.useId()
     const sensors = useSensors(
         useSensor(MouseSensor, {}),
@@ -304,7 +307,7 @@ export function DataTable({
                         size="icon"
                         className="text-muted-foreground bg-green-200/50 hover:bg-green-200/70"
                     >
-                        <IconReport/>
+                        <IconReport />
                         <span className="sr-only">Edit</span>
                     </Button>
                     <Button
@@ -336,6 +339,7 @@ export function DataTable({
             rowSelection,
             columnFilters,
             pagination,
+            globalFilter,
         },
         getRowId: (row) => row._id,
         enableRowSelection: true,
@@ -344,6 +348,7 @@ export function DataTable({
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
         onPaginationChange: setPagination,
+        onGlobalFilterChange: setGlobalFilter,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
@@ -486,10 +491,24 @@ export function DataTable({
                                 })}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="outline" size="sm">
-                        <IconPlus />
-                        <span className="hidden lg:inline">Add Event</span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-green-700 border-green-300 hover:bg-green-50 hover:border-green-400"
+                    >
+                        <IconPlus /> Add Event
                     </Button>
+                </div>
+            </div>
+            <div className="flex items-center gap-2 px-4 lg:px-6">
+                <div className="relative flex-1 max-w-sm">
+                    <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search events..."
+                        value={globalFilter ?? ""}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => table.setGlobalFilter(event.target.value)}
+                        className="w-full pl-9"
+                    />
                 </div>
             </div>
             <TabsContent

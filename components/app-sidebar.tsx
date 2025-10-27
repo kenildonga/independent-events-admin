@@ -73,7 +73,7 @@ const data = {
     },
     {
       title: "Notifications",
-      url: "#",
+      url: "/notifications",
       icon: IconBell,
     },
     {

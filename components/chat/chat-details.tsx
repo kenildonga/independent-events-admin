@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Avatar } from "@/components/ui/avatar"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { UsersIcon } from "lucide-react"
 import {
   Dialog,
   DialogTrigger,
@@ -17,6 +18,7 @@ export type ChatItem = {
   lastMessage?: string
   unread?: number
   isGroup?: boolean
+  avatar?: string
 }
 
 type ChatDetailsProps = {
@@ -38,7 +40,16 @@ export function ChatDetails({ chat, trigger }: ChatDetailsProps) {
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <div className="flex gap-2 items-center">
-            <Avatar className="size-10" />
+            <Avatar className="size-10">
+              <AvatarImage src={chat.avatar} alt={chat.name} />
+              <AvatarFallback>
+                {chat.isGroup ? (
+                  <UsersIcon className="size-5" />
+                ) : (
+                  chat.name.split(' ').map(n => n[0]).join('').slice(0, 2)
+                )}
+              </AvatarFallback>
+            </Avatar>
             <div>
               <p className="font-medium leading-tight">{chat.name}</p>
               <p className="text-muted-foreground text-xs">

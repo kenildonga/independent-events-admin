@@ -29,6 +29,7 @@ import {
     IconLayoutColumns,
     IconPencil,
     IconPlus,
+    IconSearch,
     IconTrash
 } from "@tabler/icons-react"
 import {
@@ -52,6 +53,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -155,6 +157,7 @@ export function DataTable({
         pageSize: 10,
     })
     const [activeTab, setActiveTab] = React.useState("outline")
+    const [globalFilter, setGlobalFilter] = React.useState("")
     const sortableId = React.useId()
     const sensors = useSensors(
         useSensor(MouseSensor, {}),
@@ -323,6 +326,7 @@ export function DataTable({
             rowSelection,
             columnFilters,
             pagination,
+            globalFilter,
         },
         getRowId: (row) => row.id.toString(),
         enableRowSelection: true,
@@ -331,6 +335,7 @@ export function DataTable({
         onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
         onPaginationChange: setPagination,
+        onGlobalFilterChange: setGlobalFilter,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
@@ -481,6 +486,17 @@ export function DataTable({
                         <IconPlus />
                         <span className="hidden lg:inline">Add User</span>
                     </Button> */}
+                </div>
+            </div>
+            <div className="flex items-center gap-2 px-4 lg:px-6">
+                <div className="relative flex-1 max-w-sm">
+                    <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search users..."
+                        value={globalFilter ?? ""}
+                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => table.setGlobalFilter(event.target.value)}
+                        className="w-full pl-9"
+                    />
                 </div>
             </div>
             <TabsContent

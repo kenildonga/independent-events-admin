@@ -174,7 +174,7 @@ export default function ChannelsPage() {
                                         {selectedChannel && (
                                             <div className="space-y-4">
                                                 <MessageBubble author="System" text={`Welcome to ${selectedChannel.name}.`} time="09:00" me={true} />
-                                                <MessageBubble author={selectedChannel.name} text="This is a broadcast channel. Only announcers can post." time="09:05" me={true}/>
+                                                <MessageBubble author={selectedChannel.name} text="This is a broadcast channel. Only announcers can post." time="09:05" me={true} />
                                                 <MessageBubble author="System" text="Real-time delivery integration coming soon." time="09:10" me={true} />
                                             </div>
                                         )}
