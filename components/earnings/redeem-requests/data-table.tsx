@@ -1,15 +1,6 @@
 "use client"
 
 import * as React from "react"
-
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-
-import { CSS } from "@dnd-kit/utilities"
-
 import {
   IconChevronLeft,
   IconChevronRight,
@@ -156,31 +147,6 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
   },
 ]
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
-  const { transform, transition, setNodeRef, isDragging } = useSortable({
-    id: row.original.id,
-  })
-
-  return (
-    <TableRow
-      data-state={row.getIsSelected() && "selected"}
-      data-dragging={isDragging}
-      ref={setNodeRef}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: transition,
-      }}
-    >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
-  )
-}
-
 export function DataTable({
   data: initialData,
 }: {
@@ -200,8 +166,6 @@ export function DataTable({
   const [tabValue, setTabValue] = React.useState<"all" | "pending" | "approved" | "rejected">(
     "all"
   )
-
-  const sortableId = React.useId()
 
   const table = useReactTable({
     data,
@@ -241,7 +205,6 @@ export function DataTable({
   }, [data])
 
   const rowModel = table.getRowModel()
-  const visibleRowIds = rowModel.rows.map((row) => row.original.id)
 
   const renderTable = () => (
     <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
@@ -268,14 +231,18 @@ export function DataTable({
           </TableHeader>
           <TableBody className="**:data-[slot=table-cell]:first:w-8">
             {rowModel.rows?.length ? (
-              <SortableContext
-                items={visibleRowIds}
-                strategy={verticalListSortingStrategy}
-              >
-                {rowModel.rows.map((row) => (
-                  <DraggableRow key={row.id} row={row} />
-                ))}
-              </SortableContext>
+              rowModel.rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : (
               <TableRow>
                 <TableCell
