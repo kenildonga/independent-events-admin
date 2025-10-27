@@ -78,8 +78,26 @@ const data = {
     },
     {
       title: "Earnings & Rewards",
-      url: "#",
+      url: "/earnings",
       icon: IconCoins,
+      items: [
+        {
+          title: "Redeem Requests",
+          url: "/earnings/redeem-requests",
+        },
+        {
+          title: "Manage Tasks",
+          url: "#",
+        },
+        {
+          title: "Track Task Completion",
+          url: "#",
+        },
+        {
+          title: "Referral Points",
+          url: "#",
+        },
+      ],
     },
     {
       title: "Ranking & Analytics",
