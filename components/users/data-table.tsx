@@ -13,17 +13,11 @@ import {
 } from "@tabler/icons-react"
 import {
     ColumnDef,
-    ColumnFiltersState,
     flexRender,
     getCoreRowModel,
-    getFacetedRowModel,
-    getFacetedUniqueValues,
     getFilteredRowModel,
     getPaginationRowModel,
-    getSortedRowModel,
-    SortingState,
     useReactTable,
-    VisibilityState,
 } from "@tanstack/react-table"
 import { z } from "zod"
 import ShowSidebar from "./show-sidebar"

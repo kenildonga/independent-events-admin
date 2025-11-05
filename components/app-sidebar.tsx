@@ -91,7 +91,7 @@ const data = {
         },
         {
           title: "Track Task Completion",
-          url: "#",
+          url: "/earnings/track-task-completion",
         },
         {
           title: "Referral Points",
@@ -101,17 +101,17 @@ const data = {
     },
     {
       title: "Ranking & Analytics",
-      url: "#",
+      url: "/ranking",
       icon: IconChartBar,
     },
     {
       title: "Job Management",
-      url: "#",
+      url: "/jobs",
       icon: IconBriefcase2,
     },
     {
       title: "Contacts",
-      url: "#",
+      url: "/contacts",
       icon: IconAddressBook,
     }
   ],

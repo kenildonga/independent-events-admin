@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "userName": "Cover page",
+    "eventsJoined": 5,
+    "eventsCompleted": 3,
+    "totalEarnedPoints": 50,
+    "totalRedeemedPoints": 20,
+    "rank": 1
+  },
+  {
+    "id": 2,
+    "userName": "John Doe",
+    "eventsJoined": 8,
+    "eventsCompleted": 6,
+    "totalEarnedPoints": 80,
+    "totalRedeemedPoints": 30,
+    "rank": 2
+  },
+  {
+    "id": 3,
+    "userName": "Jane Smith",
+    "eventsJoined": 7,
+    "eventsCompleted": 5,
+    "totalEarnedPoints": 70,
+    "totalRedeemedPoints": 25,
+    "rank": 3
+  }
+]

@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "firstName": "Cover",
+    "lastName": "page",
+    "email": "cover.page@example.com",
+    "subject": "Welcome to Our Service",
+    "description": "This is a welcome message for new users.",
+    "datetime": "2024-01-01T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com",
+    "subject": "Inquiry about services",
+    "description": "I would like to know more about your services.",
+    "datetime": "2024-02-15T14:30:00Z"
+  },
+  {
+    "id": 3,
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@example.com",
+    "subject": "Feedback on recent event",
+    "description": "The recent event was very well organized and enjoyable.",
+    "datetime": "2024-03-10T09:15:00Z"
+  }
+]

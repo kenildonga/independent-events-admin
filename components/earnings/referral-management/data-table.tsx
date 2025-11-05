@@ -1,9 +1,5 @@
 "use client"
-
 import * as React from "react"
-import {
-  IconPlus
-} from "@tabler/icons-react"
 import {
   ColumnDef,
   flexRender,
@@ -11,7 +7,6 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { z } from "zod"
-import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -20,6 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+
+import { IconCoins } from "@tabler/icons-react"
 
 export const schema = z.object({
   _id: z.number(),
@@ -79,8 +76,13 @@ export function DataTable({
 
   const rowModel = table.getRowModel()
 
-  const renderTable = () => (
+  return (
     <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+      <div className="items-center gap-2">
+          <p className="flex text-green-700 border-green-300">
+            Point Value is &nbsp;<IconCoins />1 = &#8377;0.50
+          </p>
+        </div>
       <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader className="bg-muted sticky top-0 z-10">
@@ -131,21 +133,6 @@ export function DataTable({
           </TableBody>
         </Table>
       </div>
-    </div>
-  )
-
-  return (
-    <div>
-      <div className="flex items-center justify-between px-4 lg:px-6 mb-6">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <IconPlus />
-            <span className="hidden lg:inline">Add Entry</span>
-            <span className="lg:hidden">Add</span>
-          </Button>
-        </div>
-      </div>
-      {renderTable()}
     </div>
   )
 }
