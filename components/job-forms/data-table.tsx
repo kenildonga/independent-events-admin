@@ -43,17 +43,24 @@ import {
 
 export const schema = z.object({
   id: z.number(),
-  firstName: z.string(),
-  lastName: z.string(),
-  email: z.string(),
-  subject: z.string(),
+  companyName: z.string(),
+  jobTitle: z.string(),
+  location: z.string(),
+  salaryRange: z.string(),
+  jobType: z.string(),
   description: z.string(),
   datetime: z.string(),
+  formLink: z.string(),
 })
 
 const TableCellViewer = ({ item }: { item: z.infer<typeof schema> }) => {
   const isMobile = useIsMobile()
-  return <ShowSidebar item={item} isMobile={isMobile} />
+  return (
+    <div className="flex gap-2">
+      <Button variant="link">Edit</Button>
+      <ShowSidebar item={item} isMobile={isMobile} />
+    </div>
+  )
 }
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
@@ -66,17 +73,24 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "Full Name",
-    header: "Full Name",
+    accessorKey: "companyName",
+    header: "Company Name",
     cell: ({ row }) => {
-      return `${row.original.firstName} ${row.original.lastName}`
+      return row.original.companyName
     },
   },
   {
-    accessorKey: "subject",
-    header: "Subject",
+    accessorKey: "jobTitle",
+    header: "Job Title",
     cell: ({ row }) => {
-      return row.original.subject
+      return row.original.jobTitle
+    },
+  },
+  {
+    accessorKey: "jobType",
+    header: "Job Type",
+    cell: ({ row }) => {
+      return row.original.jobType
     },
   },
   {
@@ -84,6 +98,22 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     header: "Date & Time",
     cell: ({ row }) => {
       return row.original.datetime
+    },
+  },
+  {
+    accessorKey: "formLink",
+    header: "Form Link",
+    cell: ({ row }) => {
+      return (
+        <a
+          href={row.original.formLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 underline"
+        >
+          Apply Here
+        </a>
+      )
     },
   },
   {

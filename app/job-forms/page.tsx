@@ -1,5 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import { DataTable } from "@/components/ranking/data-table"
+import { DataTable } from "@/components/job-forms/data-table"
 import { SiteHeader } from "@/components/site-header"
 import {
   SidebarInset,
@@ -10,12 +10,14 @@ import data from "./data.json"
 
 interface EarningsData {
   id: number;
-  userName: string;
-  eventsJoined: number;
-  eventsCompleted: number;
-  totalEarnedPoints: number;
-  totalRedeemedPoints: number;
-  rank: number;
+  companyName: string;
+  jobTitle: string;
+  location: string;
+  salaryRange: string;
+  jobType: string;
+  description: string;
+  datetime: string;
+  formLink: string;
 }
 
 export default function Page() {

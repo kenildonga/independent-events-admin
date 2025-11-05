@@ -1,5 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar"
-import { DataTable } from "@/components/ranking/data-table"
+import { DataTable } from "@/components/settings/version-control/data-table"
 import { SiteHeader } from "@/components/site-header"
 import {
   SidebarInset,
@@ -10,12 +10,12 @@ import data from "./data.json"
 
 interface EarningsData {
   id: number;
-  userName: string;
-  eventsJoined: number;
-  eventsCompleted: number;
-  totalEarnedPoints: number;
-  totalRedeemedPoints: number;
-  rank: number;
+  version: string;
+  releaseDate: string;
+  changes: string;
+  deviceType: string;
+  isForceUpdate: boolean;
+  isLatest: boolean;
 }
 
 export default function Page() {

@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "version": "1.0.0",
+    "releaseDate": "2024-01-01T10:00:00Z",
+    "changes": "Initial release of the application.",
+    "deviceType": "Android",
+    "isForceUpdate": false,
+    "isLatest": false
+  },
+  {
+    "id": 2,
+    "version": "1.1.0",
+    "releaseDate": "2024-03-15T10:00:00Z",
+    "changes": "Added new features and fixed bugs.",
+    "deviceType": "iOS",
+    "isForceUpdate": true,
+    "isLatest": false
+  },
+  {
+    "id": 3,
+    "version": "1.2.0",
+    "releaseDate": "2024-05-20T10:00:00Z",
+    "changes": "Improved performance and user interface enhancements.",
+    "deviceType": "Android",
+    "isForceUpdate": false,
+    "isLatest": true
+  }
+]

@@ -21,8 +21,6 @@ import {
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { useIsMobile } from "@/hooks/use-mobile"
-import ShowSidebar from "./show-sidebar"
 
 import {
   Select,
@@ -43,18 +41,13 @@ import {
 
 export const schema = z.object({
   id: z.number(),
-  firstName: z.string(),
-  lastName: z.string(),
-  email: z.string(),
-  subject: z.string(),
-  description: z.string(),
-  datetime: z.string(),
+  version: z.string(),
+  releaseDate: z.string(),
+  changes: z.string(),
+  deviceType: z.string(),
+  isForceUpdate: z.boolean(),
+  isLatest: z.boolean(),
 })
-
-const TableCellViewer = ({ item }: { item: z.infer<typeof schema> }) => {
-  const isMobile = useIsMobile()
-  return <ShowSidebar item={item} isMobile={isMobile} />
-}
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
@@ -66,33 +59,39 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "Full Name",
-    header: "Full Name",
+    accessorKey: "deviceType",
+    header: "Device Type",
     cell: ({ row }) => {
-      return `${row.original.firstName} ${row.original.lastName}`
+      return row.original.deviceType
     },
   },
   {
-    accessorKey: "subject",
-    header: "Subject",
+    accessorKey: "version",
+    header: "Version",
     cell: ({ row }) => {
-      return row.original.subject
+      return row.original.version
     },
   },
   {
-    accessorKey: "datetime",
-    header: "Date & Time",
+    accessorKey: "releaseDate",
+    header: "Release Date",
     cell: ({ row }) => {
-      return row.original.datetime
+      return row.original.releaseDate
     },
   },
   {
-    accessorKey: "actions",
-    header: "Actions",
+    accessorKey: "changes",
+    header: "Changes",
     cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
+      return row.original.changes
     },
-    enableHiding: false,
+  },
+  {
+    accessorKey: "isForceUpdate",
+    header: "Force Update",
+    cell: ({ row }) => {
+      return row.original.isForceUpdate ? "Yes" : "No"
+    },
   }
 ]
 
@@ -137,6 +136,27 @@ export function DataTable({
 
   return (
     <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-green-700 border-green-600 hover:bg-green-50 hover:border-green-400 w-fit mb-2"
+      >
+        Add New Version
+      </Button>
+      <div className="flex items-center gap-4 mb-2">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">Android Latest Version:</Label>
+          <span className="font-semibold text-green-700">
+            'N/A'
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">iOS Latest Version:</Label>
+          <span className="font-semibold text-green-700">
+            'N/A'
+          </span>
+        </div>
+      </div>
       <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader className="bg-muted sticky top-0 z-10">

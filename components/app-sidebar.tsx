@@ -36,8 +36,8 @@ import {
 
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
+    name: "Admin User",
+    email: "",
     avatar: "/avatars/shadcn.jpg",
   },
   navMain: [
@@ -106,34 +106,34 @@ const data = {
     },
     {
       title: "Job Management",
-      url: "/jobs",
+      url: "/job-forms",
       icon: IconBriefcase2,
     },
     {
       title: "Contacts",
       url: "/contacts",
       icon: IconAddressBook,
-    }
+    },
   ],
   navSecondary: [
     {
-      title: "App Settings",
+      title: "Settings",
       url: "#",
       icon: IconSettings,
       items: [
         {
           title: "Version Control",
-          url: "#",
+          url: "/settings/version-control",
           icon: IconGitBranch,
         },
         {
           title: "Home Screen Banners",
-          url: "#",
+          url: "/settings/home-screen-banners",
           icon: IconPhoto,
         },
         {
           title: "Startup Popups",
-          url: "#",
+          url: "/settings/startup-popups",
           icon: IconWindow,
         }
       ],
