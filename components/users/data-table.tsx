@@ -7,9 +7,8 @@ import {
     IconChevronRight,
     IconChevronsLeft,
     IconChevronsRight,
-    IconPencil,
+    IconLoader2,
     IconSearch,
-    IconTrash
 } from "@tabler/icons-react"
 import {
     ColumnDef,
@@ -50,23 +49,30 @@ import {
 import { Switch } from "@/components/ui/switch"
 
 export const schema = z.object({
-    id: z.number(),
+    _id: z.string(),
     name: z.string(),
     email: z.string(),
     phone: z.string(),
     profilePic: z.string(),
-    joinDate: z.string(),
-    status: z.string()
+    createdAt: z.string(),
+    isActive: z.boolean().optional(),
 });
 
-
+export type UserRow = z.infer<typeof schema>
 
 export function DataTable({
     data: initialData,
+    isLoading = false,
 }: {
-    data: z.infer<typeof schema>[]
+    data: UserRow[]
+    isLoading?: boolean
 }) {
+
     const [data, setData] = React.useState(() => initialData)
+
+    React.useEffect(() => {
+        setData(initialData)
+    }, [initialData])
 
     const [pagination, setPagination] = React.useState({
         pageIndex: 0,
@@ -75,31 +81,37 @@ export function DataTable({
     const [activeTab, setActiveTab] = React.useState("all")
     const [globalFilter, setGlobalFilter] = React.useState("")
 
-    // Calculate counts for each status
+    const resolveIsActive = React.useCallback((user: UserRow) => {
+        if (typeof user.isActive === "boolean") {
+            return user.isActive
+        }
+        const legacyStatus = (user as { status?: string }).status
+        return legacyStatus === "active"
+    }, [])
+
+    // Calculate counts for active/inactive states
     const statusCounts = React.useMemo(() => {
-        const counts = { active: 0, inactive: 0, pending: 0 }
+        const counts = { active: 0, inactive: 0 }
         data.forEach(user => {
-            if (counts[user.status as keyof typeof counts] !== undefined) {
-                counts[user.status as keyof typeof counts]++
-            }
+            if (resolveIsActive(user)) counts.active++
+            else counts.inactive++
         })
         return counts
-    }, [data])
+    }, [data, resolveIsActive])
 
     // Filter data based on active tab
     const filteredData = React.useMemo(() => {
         if (activeTab === "all") return data
-        if (activeTab === "active") return data.filter(item => item.status === "active")
-        if (activeTab === "inactive") return data.filter(item => item.status === "inactive")
-        if (activeTab === "pending") return data.filter(item => item.status === "pending")
+        if (activeTab === "active") return data.filter((item) => resolveIsActive(item))
+        if (activeTab === "inactive") return data.filter((item) => !resolveIsActive(item))
         return data
-    }, [data, activeTab])
+    }, [data, activeTab, resolveIsActive])
 
-    const updateStatus = (id: number, status: string) => {
-        setData(prev => prev.map(user => user.id === id ? { ...user, status } : user))
+    const updateStatus = (_id: string, isActive: boolean) => {
+        setData(prev => prev.map(user => user._id === _id ? { ...user, isActive } : user))
     }
 
-    const columns: ColumnDef<z.infer<typeof schema>>[] = [
+    const columns: ColumnDef<UserRow>[] = [
         {
             id: "rowNumber",
             header: "#",
@@ -130,7 +142,7 @@ export function DataTable({
             header: "Name",
             cell: ({ row }) => {
                 return (
-                    <TableCellViewer item={row.original} />
+                    <TableCellViewer userId={row.original._id} name={row.original.name} />
                 )
             },
             enableHiding: false,
@@ -154,74 +166,54 @@ export function DataTable({
             ),
         },
         {
-            accessorKey: "joinDate",
+            accessorKey: "createdAt",
             header: "Join Date",
             cell: ({ row }) => (
-                <div className="w-24">
-                    {row.original.joinDate}
+                <div className="w-36">
+                    {(() => {
+                        const rawDate = row.original.createdAt || (row.original as { joinDate?: string }).joinDate
+                        if (!rawDate) return "-"
+                        const date = new Date(rawDate)
+                        return isNaN(date.getTime()) ? rawDate : date.toLocaleDateString()
+                    })()}
                 </div>
             ),
         },
         {
-            accessorKey: "status",
+            id: "status",
             header: "Status",
-            cell: ({ row }) => (
-                <div className="space-y-1">
-                    <Badge
-                        variant="outline"
-                        className={`px-1.5 ${row.original.status === "active"
-                                ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-300 dark:border-green-700"
-                                : row.original.status === "inactive"
-                                    ? "bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-300 dark:border-red-700"
-                                    : "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-700"
-                            }`}
-                    >
-                        {row.original.status}
-                    </Badge>
-                </div>
-            ),
+            cell: ({ row }) => {
+                const isActive = resolveIsActive(row.original)
+                return (
+                    <div className="space-y-1">
+                        <Badge
+                            variant="outline"
+                            className={`px-1.5 ${isActive
+                                    ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-300 dark:border-green-700"
+                                    : "bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-300 dark:border-red-700"
+                                }`}
+                        >
+                            {isActive ? "active" : "inactive"}
+                        </Badge>
+                    </div>
+                )
+            },
         },
         {
             id: "toggle",
             header: "Toggle",
             cell: ({ row }) => {
-                const isActive = row.original.status === "active"
-                const isInactive = row.original.status === "inactive"
+                const isActive = resolveIsActive(row.original)
                 return (
                     <Switch
                         checked={isActive}
-                        disabled={!isActive && !isInactive}
+                        disabled={isLoading}
                         onCheckedChange={(checked) => {
-                            if (isActive || isInactive) {
-                                const newStatus = checked ? "active" : "inactive"
-                                updateStatus(row.original.id, newStatus)
-                            }
+                            updateStatus(row.original._id, !!checked)
                         }}
                     />
                 )
             },
-        },
-        {
-            id: "actions",
-            cell: ({ row }) => (
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
-                    >
-                        <IconPencil />
-                        <span className="sr-only">Edit</span>
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        size="icon"
-                    >
-                        <IconTrash />
-                        <span className="sr-only">Delete</span>
-                    </Button>
-                </div>
-            ),
         },
     ]
 
@@ -232,7 +224,7 @@ export function DataTable({
             pagination,
             globalFilter,
         },
-        getRowId: (row) => row.id.toString(),
+        getRowId: (row) => row._id,
         enableRowSelection: true,
         onPaginationChange: setPagination,
         onGlobalFilterChange: setGlobalFilter,
@@ -264,7 +256,19 @@ export function DataTable({
                         ))}
                     </TableHeader>
                     <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                        {table.getRowModel().rows?.length ? (
+                        {isLoading ? (
+                            <TableRow>
+                                <TableCell
+                                    colSpan={columns.length}
+                                    className="h-32 text-center"
+                                >
+                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                        <IconLoader2 className="size-5 animate-spin" />
+                                        <span>Loading users…</span>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
                                 <TableRow
                                     key={row.id}
@@ -315,7 +319,6 @@ export function DataTable({
                         <SelectItem value="all">All Users</SelectItem>
                         <SelectItem value="active">Active Users</SelectItem>
                         <SelectItem value="inactive">Inactive Users</SelectItem>
-                        <SelectItem value="pending">Pending Users</SelectItem>
                     </SelectContent>
                 </Select>
                 <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
@@ -325,9 +328,6 @@ export function DataTable({
                     </TabsTrigger>
                     <TabsTrigger value="inactive">
                         Inactive <Badge variant="secondary">{statusCounts.inactive}</Badge>
-                    </TabsTrigger>
-                    <TabsTrigger value="pending">
-                        Pending <Badge variant="secondary">{statusCounts.pending}</Badge>
                     </TabsTrigger>
                 </TabsList>
                 <div className="flex items-center gap-2">
@@ -362,12 +362,6 @@ export function DataTable({
             </TabsContent>
             <TabsContent
                 value="inactive"
-                className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-            >
-                {renderTableContent()}
-            </TabsContent>
-            <TabsContent
-                value="pending"
                 className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
             >
                 {renderTableContent()}
@@ -455,10 +449,11 @@ export function DataTable({
 
 
 
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+function TableCellViewer({ userId, name }: { userId: string; name: string }) {
+
     const isMobile = useIsMobile()
 
     return (
-        <ShowSidebar item={item} isMobile={isMobile} />
+        <ShowSidebar userId={userId} isMobile={isMobile} fallbackName={name} />
     )
 }

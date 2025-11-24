@@ -38,9 +38,7 @@ export function MessageBubble({ author, text, time, date, me, attachments, avata
     return () => {
       if (attachments) {
         attachments.forEach(attachment => {
-          if (attachment.url.startsWith('blob:')) {
             URL.revokeObjectURL(attachment.url)
-          }
         })
       }
     }
@@ -49,7 +47,7 @@ export function MessageBubble({ author, text, time, date, me, attachments, avata
   return (
     <div
       className={cn(
-        "max-w-[75%] flex items-start gap-3 text-sm",
+        "max-w-[85%] md:max-w-[75%] flex items-start gap-3 text-sm",
         me ? "ml-auto flex-row-reverse" : "items-start"
       )}
     >
@@ -61,10 +59,10 @@ export function MessageBubble({ author, text, time, date, me, attachments, avata
           </AvatarFallback>
         </Avatar>
       )}
-  <div className="flex flex-col gap-1 max-w-full">
+      <div className="flex flex-col gap-1 max-w-full">
         <div
           className={cn(
-    "w-fit max-w-full rounded-md px-3 py-2 shadow-sm break-words",
+            "w-fit max-w-full rounded-md px-3 py-2 shadow-sm break-words",
             me
               ? "bg-primary text-primary-foreground rounded-br-sm"
               : "bg-accent text-foreground rounded-bl-sm"
@@ -73,71 +71,71 @@ export function MessageBubble({ author, text, time, date, me, attachments, avata
           {!me && (
             <p className="font-medium text-xs mb-0.5 opacity-90">{author}</p>
           )}        {/* Attachments */}
-        {attachments && attachments.length > 0 && (
-          <div className="space-y-2 mb-2">
-            {attachments.map((attachment) => (
-              <div key={attachment.id} className="flex items-center gap-2">
-                {attachment.type === 'image' ? (
-                  <div className="relative group">
-                    <Image
-                      src={attachment.url}
-                      alt={attachment.name}
-                      width={200}
-                      height={150}
-                      className="rounded-md object-cover max-w-full h-auto"
-                      onError={(e) => {
-                        // Fallback to a placeholder if image fails to load
-                        const target = e.target as HTMLImageElement;
-                        target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIE5vdCBBdmFpbGFibGU8L3RleHQ+PC9zdmc+';
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center">
+          {attachments && attachments.length > 0 && (
+            <div className="space-y-2 mb-2">
+              {attachments.map((attachment) => (
+                <div key={attachment.id} className="flex items-center gap-2">
+                  {attachment.type === 'image' ? (
+                    <div className="relative group">
+                      <Image
+                        src={attachment.url}
+                        alt={attachment.name}
+                        width={200}
+                        height={150}
+                        className="rounded-md object-cover max-w-full h-auto"
+                        onError={(e) => {
+                          // Fallback to a placeholder if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIE5vdCBBdmFpbGFibGU8L3RleHQ+PC9zdmc+';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-md flex items-center justify-center">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => window.open(attachment.url, '_blank')}
+                          className="text-xs"
+                        >
+                          <DownloadIcon className="w-3 h-3 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2 bg-background/10 rounded-md border overflow-hidden">
+                      <FileIcon className="w-4 h-4 shrink-0" />
+                      <div className="flex-1 min-w-0 grid gap-0.5">
+                        <p className="text-xs font-medium truncate">{attachment.name}</p>
+                        {attachment.size && (
+                          <p className="text-xs text-muted-foreground truncate">{formatFileSize(attachment.size)}</p>
+                        )}
+                      </div>
                       <Button
                         size="sm"
-                        variant="secondary"
+                        variant="ghost"
                         onClick={() => window.open(attachment.url, '_blank')}
-                        className="text-xs"
+                        className="h-6 w-6 p-0 shrink-0"
                       >
-                        <DownloadIcon className="w-3 h-3 mr-1" />
-                        View
+                        <DownloadIcon className="w-3 h-3" />
                       </Button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 p-2 bg-background/10 rounded-md border">
-                    <FileIcon className="w-4 h-4" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{attachment.name}</p>
-                      {attachment.size && (
-                        <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => window.open(attachment.url, '_blank')}
-                      className="h-6 w-6 p-0"
-                    >
-                      <DownloadIcon className="w-3 h-3" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
-        {/* Text content */}
-        {text && <p className="whitespace-pre-wrap leading-snug">{text}</p>}
+          {/* Text content */}
+          {text && <p className="whitespace-pre-wrap leading-snug">{text}</p>}
 
-        {/* Show attachments even if no text */}
-        {!text && attachments && attachments.length > 0 && (
-          <p className="text-xs text-muted-foreground italic">Shared {attachments.length} file{attachments.length > 1 ? 's' : ''}</p>
-        )}
-      </div>
-      <span className="text-muted-foreground text-[10px] tracking-wide">
-        {date && `${date} • `}{time}
-      </span>
+          {/* Show attachments even if no text */}
+          {!text && attachments && attachments.length > 0 && (
+            <p className="text-xs text-muted-foreground italic">Shared {attachments.length} file{attachments.length > 1 ? 's' : ''}</p>
+          )}
+        </div>
+        <span className="self-end text-muted-foreground text-[10px] tracking-wide">
+          {time}
+        </span>
       </div>
     </div>
   )

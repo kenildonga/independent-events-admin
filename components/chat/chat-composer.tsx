@@ -1,8 +1,9 @@
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ImageIcon, FileIcon } from "lucide-react"
+import { ImageIcon, FileIcon, LoaderIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { uploadChatMedia } from "@/utils/chat-upload"
 
 export type Attachment = {
   id: string
@@ -11,6 +12,7 @@ export type Attachment = {
   name: string
   size?: number
   file: File
+  uploadedFilename?: string
 }
 
 interface ChatComposerProps {
@@ -23,15 +25,40 @@ export function ChatComposer({ placeholder, onSend, disabled }: ChatComposerProp
   const [message, setMessage] = React.useState("")
   const [attachments, setAttachments] = React.useState<Attachment[]>([])
   const [isDragOver, setIsDragOver] = React.useState(false)
+  const [isUploading, setIsUploading] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const imageInputRef = React.useRef<HTMLInputElement>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if ((message.trim() || attachments.length > 0) && !disabled) {
-      onSend(message.trim(), attachments)
-      setMessage("")
-      setAttachments([])
+    if ((message.trim() || attachments.length > 0) && !disabled && !isUploading) {
+      setIsUploading(true)
+      setUploadError(null)
+
+      try {
+        // Upload all attachments to S3 first
+        const uploadedAttachments = await Promise.all(
+          attachments.map(async (attachment) => {
+            const uploaded = await uploadChatMedia(attachment.file)
+            return {
+              ...attachment,
+              url: uploaded.publicUrl,
+              uploadedFilename: uploaded.filename,
+            }
+          })
+        )
+
+        // Send message with uploaded URLs
+        onSend(message.trim(), uploadedAttachments)
+        setMessage("")
+        setAttachments([])
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Upload failed"
+        setUploadError(errorMessage)
+      } finally {
+        setIsUploading(false)
+      }
     }
   }
 
@@ -84,6 +111,9 @@ export function ChatComposer({ placeholder, onSend, disabled }: ChatComposerProp
       {/* Attachments preview */}
       {attachments.length > 0 && (
         <div className="px-3 py-2 border-b bg-muted/30">
+          {uploadError && (
+            <p className="text-destructive text-xs mb-2">{uploadError}</p>
+          )}
           <div className="flex flex-wrap gap-2">
             {attachments.map((attachment) => (
               <div
@@ -171,9 +201,16 @@ export function ChatComposer({ placeholder, onSend, disabled }: ChatComposerProp
         <Button
           type="submit"
           size="sm"
-          disabled={disabled || (!message.trim() && attachments.length === 0)}
+          disabled={disabled || isUploading || (!message.trim() && attachments.length === 0)}
         >
-          Send
+          {isUploading ? (
+            <>
+              <LoaderIcon className="w-4 h-4 mr-1 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            "Send"
+          )}
         </Button>
       </form>
     </div>

@@ -2,11 +2,21 @@
 
 import * as React from "react"
 import { MenuIcon } from "lucide-react"
+import { io, type Socket } from "socket.io-client"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { type ChatItem, MessageBubble, ChatComposer, ConversationList, ChatHeader, type Attachment, DateSeparator } from "@/components/chat"
+import {
+    type ChatItem,
+    MessageBubble,
+    ChatComposer,
+    ConversationList,
+    ChatHeader,
+    DateSeparator
+} from "@/components/chat"
+import type { Attachment as MessageAttachment } from "@/components/chat"
+import type { Attachment as ComposerAttachment } from "@/components/chat/chat-composer"
 
 import { AppSidebar } from "@/components/app-sidebar"
 import {
@@ -14,110 +24,265 @@ import {
     SidebarProvider,
 } from "@/components/ui/sidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import apiClient from "@/utils/axios"
 
-const groupChats: ChatItem[] = [
-    {
-        id: "g-1",
-        name: "Product Team",
-        lastMessage: "Design handoff ready.",
-        unread: 2,
-        isGroup: true,
-        avatar: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=32&h=32&fit=crop&crop=face"
-    },
-    {
-        id: "g-2",
-        name: "Marketing Sprint",
-        lastMessage: "Scheduled next campaign.",
-        unread: 0,
-        isGroup: true,
-        avatar: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=32&h=32&fit=crop&crop=face"
+// ... [Keep all your Type definitions here unchanged] ...
+
+type ChatListApiItem = {
+    _id: string
+    name: string
+    lastMessage?: string
+    unread?: number
+    isGroup?: boolean
+    profile?: string
+}
+
+type ChatListResponse = {
+    code: number
+    message: string
+    data: ChatListApiItem[]
+}
+
+type ChatMessageApiItem = {
+    _id: string
+    author?: string
+    text?: string
+    dateTime: string
+    me?: boolean
+    attachments?: Array<{
+        _id: string
+        type?: string
+        url?: string
+        name?: string
+        size?: string
+    }>
+}
+
+type ChatMessagesResponse = {
+    code: number
+    message: string
+    data: ChatMessageApiItem[]
+}
+
+type ChatMessage = {
+    id: string
+    author: string
+    text: string
+    time: string
+    date?: string
+    me: boolean
+    attachments?: MessageAttachment[]
+    avatar?: string
+    clientFingerprint?: string
+    isOptimistic?: boolean
+    timestamp: number
+}
+
+type SocketMessagePayload = {
+    _id: string
+    chatId: string
+    text?: string
+    attachments?: Array<{
+        _id?: string
+        type?: string
+        url?: string
+        name?: string
+        size?: number | string
+    }>
+    createdAt?: string
+    updatedAt?: string
+    dateTime?: string
+    author?: string
+    userId?: string
+    adminId?: string
+    userType?: "user" | "admin"
+}
+
+type SocketErrorPayload = {
+    error?: string
+}
+
+const CHAT_LIST_ENDPOINT = process.env.NEXT_PUBLIC_CHAT_LIST_URL ?? "/chat/get-list"
+const CHAT_MESSAGES_ENDPOINT = process.env.NEXT_PUBLIC_CHAT_MESSAGES_URL ?? "/chat/get-messages"
+const CHAT_MESSAGES_PAGE_SIZE = Number(process.env.NEXT_PUBLIC_CHAT_MESSAGES_LIMIT ?? 20)
+const CHAT_SOCKET_URL = "http://localhost:3031"
+const STORAGE_BASE_URL = process.env.NEXT_PUBLIC_STORAGE_BASE_URL ?? "https://pub-6a70b23427814de4a2a9a328814f5be7.r2.dev/chat-media/"
+
+const parseAttachmentSizeToBytes = (sizeLabel?: string) => {
+    if (!sizeLabel) return undefined
+    const match = sizeLabel.trim().match(/([\d.]+)\s*(B|KB|MB|GB|TB)/i)
+    if (!match) return undefined
+    const value = Number(match[1])
+    if (Number.isNaN(value)) return undefined
+    const unit = match[2].toUpperCase()
+    const multipliers: Record<string, number> = {
+        B: 1,
+        KB: 1024,
+        MB: 1024 * 1024,
+        GB: 1024 * 1024 * 1024,
+        TB: 1024 * 1024 * 1024 * 1024
     }
-]
+    return Math.round(value * (multipliers[unit] ?? 1))
+}
 
-const directChats: ChatItem[] = [
-    {
-        id: "u-1",
-        name: "Alice Johnson",
-        lastMessage: "I'll push the changes.",
-        unread: 1,
-        avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=32&h=32&fit=crop&crop=face"
-    },
-    {
-        id: "u-2",
-        name: "David Park",
-        lastMessage: "Thanks!",
-        unread: 0,
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=32&h=32&fit=crop&crop=face"
-    },
-    {
-        id: "u-3",
-        name: "Sarah Kim",
-        lastMessage: "Can we sync at 3?",
-        unread: 4,
-        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=32&h=32&fit=crop&crop=face"
-    },
-]
+const mapMessageFromApi = (
+    item: ChatMessageApiItem,
+    formatDateLabel: (date: Date) => string,
+    avatar?: string
+): ChatMessage => {
+    const timestamp = new Date(item.dateTime)
+    const normalizedDate = Number.isNaN(timestamp.getTime()) ? new Date() : timestamp
+    const isSelf = Boolean(item.me)
+    return {
+        id: item._id,
+        author: isSelf ? "You" : item.author ?? "Unknown",
+        text: item.text ?? "",
+        time: normalizedDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        date: formatDateLabel(normalizedDate),
+        me: isSelf,
+        attachments: (item.attachments ?? []).map((attachment) => ({
+            id: attachment._id,
+            type: attachment.type === "image" ? "image" : "document",
+            url: attachment.url ?? "#",
+            name: attachment.name ?? "Attachment",
+            size: parseAttachmentSizeToBytes(attachment.size)
+        })),
+        avatar,
+        timestamp: normalizedDate.getTime()
+    }
+}
+
+const getChatErrorMessage = (error: unknown) => {
+    if (typeof error === "object" && error !== null) {
+        const maybeAxiosError = error as {
+            isAxiosError?: boolean
+            message?: string
+            response?: { data?: { message?: string } }
+        }
+
+        if (maybeAxiosError.isAxiosError) {
+            return maybeAxiosError.response?.data?.message ?? maybeAxiosError.message ?? "Unable to load chats"
+        }
+
+        if ("message" in maybeAxiosError && typeof maybeAxiosError.message === "string") {
+            return maybeAxiosError.message
+        }
+    }
+
+    return "Unable to load chats"
+}
+
+const mapChatItems = (items: ChatListApiItem[] = []): ChatItem[] =>
+    items.map((item) => ({
+        id: item._id,
+        name: item.name,
+        lastMessage: item.lastMessage ?? "",
+        unread: item.unread ?? 0,
+        isGroup: item.isGroup ?? false,
+        avatar: item.profile
+    }))
+
+const buildMessageFingerprint = (text: string, attachments: MessageAttachment[] = []) => {
+    const normalizedText = (text ?? "").trim()
+    const attachmentKey = attachments
+        .map((attachment) => `${attachment.type}:${attachment.name}:${attachment.size ?? 0}:${attachment.url}`)
+        .join("|")
+    return `${normalizedText}|${attachmentKey}`
+}
+
+const mapSocketMessageToChatMessage = (
+    payload: SocketMessagePayload,
+    formatDateLabel: (date: Date) => string,
+    fallbackAuthor: string,
+    avatar: string | undefined,
+    adminId: string | null
+): ChatMessage => {
+    const timestamp = payload.createdAt ?? payload.dateTime ?? new Date().toISOString()
+    const parsedDate = new Date(timestamp)
+    const normalizedDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate
+    const me = Boolean(
+        payload.userType === "admin" && payload.adminId && adminId && payload.adminId === adminId
+    )
+
+    const attachments = (payload.attachments ?? []).map((attachment, index) => {
+        const parsedSize = typeof attachment.size === "number"
+            ? attachment.size
+            : parseAttachmentSizeToBytes(typeof attachment.size === "string" ? attachment.size : undefined)
+        const attachmentType: MessageAttachment["type"] = attachment.type === "image" ? "image" : "document"
+
+        return {
+            id: attachment._id ?? `${payload._id}-socket-${index}`,
+            type: attachmentType,
+            url: attachment.url?.startsWith("http") ? attachment.url : `${STORAGE_BASE_URL}${attachment.url ?? ""}`,
+            name: attachment.name ?? "Attachment",
+            size: parsedSize
+        }
+    })
+
+    return {
+        id: payload._id,
+        author: me ? "You" : payload.author ?? fallbackAuthor,
+        text: payload.text ?? "",
+        time: normalizedDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        date: formatDateLabel(normalizedDate),
+        me,
+        attachments,
+        avatar,
+        timestamp: normalizedDate.getTime()
+    }
+}
+
+const sortMessagesAscending = (messages: ChatMessage[]) =>
+    [...messages].sort((a, b) => a.timestamp - b.timestamp)
+
+// --- NEW HELPER: Ensure unique messages to prevent duplicate key errors ---
+const deduplicateMessages = (messages: ChatMessage[]) => {
+    const seen = new Set<string>()
+    return messages.filter((msg) => {
+        if (seen.has(msg.id)) return false
+        seen.add(msg.id)
+        return true
+    })
+}
 
 export default function ChatPage() {
+    const [adminId, setAdminId] = React.useState<string | null>(null)
+
+    React.useEffect(() => {
+        if (typeof window !== "undefined") {
+            const stored = localStorage.getItem("adminId")
+            setAdminId(stored ?? null)
+        }
+    }, [])
+
     const isMobile = useIsMobile()
     const [activeTab, setActiveTab] = React.useState("groups")
-    const [selectedChat, setSelectedChat] = React.useState<ChatItem | null>(groupChats[0] ?? null)
+    const [selectedChat, setSelectedChat] = React.useState<ChatItem | null>(null)
     const [sheetOpen, setSheetOpen] = React.useState(false)
-    const [messages, setMessages] = React.useState<Array<{
-        id: string
-        author: string
-        text: string
-        time: string
-        date?: string
-        me: boolean
-        attachments?: Attachment[]
-        avatar?: string
-    }>>([
-        {
-            id: "1",
-            author: "You",
-            text: "Here's the project document I mentioned",
-            time: "09:15",
-            date: "Today",
-            me: true,
-            attachments: [{
-                id: "att-1",
-                type: "document",
-                url: "#",
-                name: "project-requirements.pdf",
-                size: 2048576
-            }]
-        },
-        {
-            id: "2",
-            author: selectedChat?.name || "Team",
-            text: "Thanks! I'll review it.",
-            time: "09:16",
-            date: "Today",
-            me: false,
-            avatar: selectedChat?.avatar
-        },
-        {
-            id: "3",
-            author: "You",
-            text: "Also sharing the design mockup",
-            time: "09:17",
-            date: "Today",
-            me: true,
-            attachments: [{
-                id: "att-2",
-                type: "image",
-                url: "https://picsum.photos/400/300?random=1",
-                name: "design-mockup.png"
-            }]
-        }
-    ])
+    const [groupChats, setGroupChats] = React.useState<ChatItem[]>([])
+    const [directChats, setDirectChats] = React.useState<ChatItem[]>([])
+    const [chatListLoading, setChatListLoading] = React.useState(false)
+    const [chatListError, setChatListError] = React.useState<string | null>(null)
+    const [searchTerm, setSearchTerm] = React.useState("")
+    const [messages, setMessages] = React.useState<ChatMessage[]>([])
+    const [messagesLoading, setMessagesLoading] = React.useState(false)
+    const [messagesError, setMessagesError] = React.useState<string | null>(null)
+    const [messagePagination, setMessagePagination] = React.useState({
+        offset: 0,
+        hasMore: true
+    })
+    const [isLoadingMoreMessages, setIsLoadingMoreMessages] = React.useState(false)
+    const [loadMoreError, setLoadMoreError] = React.useState<string | null>(null)
+    const [socketError, setSocketError] = React.useState<string | null>(null)
+    const [isSocketConnected, setIsSocketConnected] = React.useState(false)
 
     // Ref for messages container to auto-scroll
     const messagesContainerRef = React.useRef<HTMLDivElement>(null)
+    const socketRef = React.useRef<Socket | null>(null)
+    const shouldAutoScrollRef = React.useRef(true)
 
     // Helper function to format date
-    const formatDate = (date: Date) => {
+    const formatDateLabel = React.useCallback((date: Date) => {
         const today = new Date()
         const yesterday = new Date(today)
         yesterday.setDate(yesterday.getDate() - 1)
@@ -126,45 +291,488 @@ export default function ChatPage() {
             return "Today"
         } else if (date.toDateString() === yesterday.toDateString()) {
             return "Yesterday"
-        } else {
-            return date.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            })
         }
-    }
+
+        return date.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+    }, [])
+
+    // --- FIXED: Cleanup on Tab Change to prevent old messages showing ---
+    React.useEffect(() => {
+        setMessages([])
+        setMessagesError(null)
+        setLoadMoreError(null)
+        setMessagePagination({ offset: 0, hasMore: true })
+        setIsLoadingMoreMessages(false)
+        setMessagesLoading(false)
+        // Note: We don't set selectedChat(null) here strictly if we want to preserve selection logic below
+    }, [activeTab])
 
     // Auto-scroll to bottom when messages change
     React.useEffect(() => {
-        if (messagesContainerRef.current) {
-            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+        const container = messagesContainerRef.current
+        if (!container) return
+
+        if (shouldAutoScrollRef.current) {
+            container.scrollTop = container.scrollHeight
         }
+        // Reset auto-scroll unless explicitly requested
+        // We only set this to false when loading PREVIOUS messages
     }, [messages])
 
     React.useEffect(() => {
-        if (selectedChat) {
-            const stillExists = [...groupChats, ...directChats].some(
-                (c) => c.id === selectedChat.id
-            )
-            if (!stillExists) setSelectedChat(null)
+        let isMounted = true
+        let intervalId: NodeJS.Timeout
+
+        // We accept a 'showLoading' flag. 
+        // We set it to false for the 3-second background updates.
+        const fetchChatLists = async (showLoading = true) => {
+            if (showLoading) {
+                setChatListLoading(true)
+                setChatListError(null)
+            }
+            
+            try {
+                const [groupResponse, directResponse] = await Promise.all([
+                    apiClient.post<ChatListResponse>(CHAT_LIST_ENDPOINT, { type: "group" }),
+                    apiClient.post<ChatListResponse>(CHAT_LIST_ENDPOINT, { type: "private" })
+                ])
+
+                if (!isMounted) return
+
+                const mappedGroups = mapChatItems(groupResponse.data?.data)
+                const mappedDirect = mapChatItems(directResponse.data?.data)
+
+                setGroupChats(mappedGroups)
+                setDirectChats(mappedDirect)
+                
+                // Note: We don't force selection changes here to prevent 
+                // the active chat from jumping around while the user is typing.
+
+            } catch (error) {
+                if (!isMounted) return
+                // Only show error on the initial load to avoid annoying popups during background sync
+                if (showLoading) {
+                    setChatListError(getChatErrorMessage(error))
+                }
+            } finally {
+                if (isMounted && showLoading) {
+                    setChatListLoading(false)
+                }
+            }
         }
-    }, [activeTab, selectedChat])
+
+        // 1. Initial Load (Shows Spinner)
+        fetchChatLists(true)
+
+        // 2. Set up the 3-second interval (Silent Background Update)
+        intervalId = setInterval(() => {
+            fetchChatLists(false)
+        }, 1500)
+
+        // Cleanup: Stop the timer and mark as unmounted when tab changes or component unmounts
+        return () => {
+            isMounted = false
+            clearInterval(intervalId)
+        }
+    }, [activeTab])
+
+    // --- FIXED: Messages Fetching Logic ---
+    React.useEffect(() => {
+        if (!selectedChat) {
+            setMessages([])
+            return
+        }
+
+        // 1. Synchronous Clear: Immediately clear messages to prevent ghosting/flashing
+        setMessages([])
+        setMessagesError(null)
+        setMessagePagination({ offset: 0, hasMore: true })
+        setLoadMoreError(null)
+        setMessagesLoading(true)
+
+        let isMounted = true
+
+        const fetchChatMessages = async () => {
+            try {
+                const response = await apiClient.post<ChatMessagesResponse>(CHAT_MESSAGES_ENDPOINT, {
+                    chatId: selectedChat.id,
+                    limit: String(CHAT_MESSAGES_PAGE_SIZE),
+                    offset: "0"
+                })
+
+                if (!isMounted) return
+
+                const mappedMessages = (response.data?.data ?? []).map((item) =>
+                    mapMessageFromApi(item, formatDateLabel, selectedChat.avatar)
+                )
+
+                const normalizedMessages = mappedMessages.map((message) => ({
+                    ...message,
+                    clientFingerprint: buildMessageFingerprint(message.text, message.attachments),
+                    isOptimistic: false
+                }))
+
+                shouldAutoScrollRef.current = true
+                // 2. Deduplicate just in case API sends dups
+                setMessages(sortMessagesAscending(deduplicateMessages(normalizedMessages)))
+                setMessagePagination({
+                    offset: normalizedMessages.length,
+                    hasMore: normalizedMessages.length === CHAT_MESSAGES_PAGE_SIZE
+                })
+            } catch (error) {
+                if (!isMounted) return
+                setMessagesError(getChatErrorMessage(error))
+            } finally {
+                if (isMounted) {
+                    setMessagesLoading(false)
+                }
+            }
+        }
+
+        fetchChatMessages()
+
+        return () => {
+            isMounted = false
+        }
+    }, [selectedChat?.id, formatDateLabel]) // Dependency on ID is safer than object
+
+    React.useEffect(() => {
+        const chatsInTab = activeTab === "groups" ? groupChats : directChats
+        if (chatsInTab.length === 0) {
+            // Don't nullify if we are loading, only if the list is truly empty after load
+            if (!chatListLoading && selectedChat !== null && !groupChats.find(c => c.id === selectedChat.id) && !directChats.find(c => c.id === selectedChat.id)) {
+                setSelectedChat(null)
+            }
+            return
+        }
+
+        const stillExists = chatsInTab.some((chat) => chat.id === selectedChat?.id)
+        if (!stillExists) {
+            setSelectedChat(chatsInTab[0])
+        }
+    }, [activeTab, groupChats, directChats])
+
+    const loadMoreMessages = React.useCallback(async () => {
+        if (!selectedChat || !messagePagination.hasMore || isLoadingMoreMessages) {
+            return
+        }
+
+        setIsLoadingMoreMessages(true)
+        setLoadMoreError(null)
+
+        // Capture scroll position before update
+        const container = messagesContainerRef.current
+        const previousScrollHeight = container?.scrollHeight ?? 0
+        const previousScrollTop = container?.scrollTop ?? 0
+
+        try {
+            const response = await apiClient.post<ChatMessagesResponse>(CHAT_MESSAGES_ENDPOINT, {
+                chatId: selectedChat.id,
+                limit: String(CHAT_MESSAGES_PAGE_SIZE),
+                offset: String(messagePagination.offset)
+            })
+
+            const mappedMessages = (response.data?.data ?? []).map((item) =>
+                mapMessageFromApi(item, formatDateLabel, selectedChat.avatar)
+            )
+
+            const normalizedMessages = mappedMessages.map((message) => ({
+                ...message,
+                clientFingerprint: buildMessageFingerprint(message.text, message.attachments),
+                isOptimistic: false
+            }))
+
+            shouldAutoScrollRef.current = false
+
+            // --- FIXED: Deduplication logic here prevents Key Error ---
+            setMessages((prev) => {
+                // Combine new (older history) messages with existing messages
+                const combined = [...normalizedMessages, ...prev]
+                // Remove duplicates based on ID (Socket vs API race condition fix)
+                const unique = deduplicateMessages(combined)
+                return sortMessagesAscending(unique)
+            })
+
+            setMessagePagination((prev) => ({
+                offset: prev.offset + normalizedMessages.length,
+                hasMore: normalizedMessages.length === CHAT_MESSAGES_PAGE_SIZE
+            }))
+
+            // Restore scroll position relative to bottom
+            requestAnimationFrame(() => {
+                if (messagesContainerRef.current) {
+                    const newScrollHeight = messagesContainerRef.current.scrollHeight
+                    messagesContainerRef.current.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight)
+                }
+            })
+
+        } catch (error) {
+            setLoadMoreError(getChatErrorMessage(error))
+        } finally {
+            setIsLoadingMoreMessages(false)
+        }
+    }, [selectedChat, messagePagination.hasMore, messagePagination.offset, isLoadingMoreMessages, formatDateLabel])
+
+    const handleSendMessage = React.useCallback((messageText: string, composerAttachments?: ComposerAttachment[]) => {
+        if (!selectedChat || !socketRef.current || !isSocketConnected) {
+            setSocketError("Unable to send message. Connecting to chat server...")
+            return
+        }
+
+        const trimmedMessage = messageText.trim()
+        const mappedAttachments: MessageAttachment[] = (composerAttachments ?? []).map((attachment) => ({
+            id: attachment.id,
+            type: attachment.type,
+            url: attachment.url,
+            name: attachment.name,
+            size: attachment.size
+        }))
+
+        if (!trimmedMessage && mappedAttachments.length === 0) {
+            return
+        }
+
+        const now = new Date()
+        const fingerprint = buildMessageFingerprint(trimmedMessage, mappedAttachments)
+        const optimisticMessage: ChatMessage = {
+            id: `temp-${now.getTime()}-${Math.random()}`,
+            author: "You",
+            text: trimmedMessage,
+            time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            date: formatDateLabel(now),
+            me: true,
+            attachments: mappedAttachments,
+            avatar: selectedChat.avatar,
+            clientFingerprint: fingerprint,
+            isOptimistic: true,
+            timestamp: now.getTime()
+        }
+
+        shouldAutoScrollRef.current = true
+        setMessages((prev) => sortMessagesAscending([...prev, optimisticMessage]))
+        setMessagePagination((prev) => ({
+            ...prev,
+            offset: prev.offset + 1
+        }))
+
+        socketRef.current.emit("sendMessage", {
+            chatId: selectedChat.id,
+            text: trimmedMessage,
+            attachments: (composerAttachments ?? []).length
+                ? (composerAttachments ?? []).map((attachment) => ({
+                    type: attachment.type,
+                    url: attachment.uploadedFilename ?? attachment.url,
+                    name: attachment.name,
+                    size: attachment.size
+                }))
+                : undefined
+        })
+        setSocketError(null)
+    }, [selectedChat, isSocketConnected, formatDateLabel])
+
+    const filteredGroupChats = React.useMemo(() => {
+        if (!searchTerm) return groupChats
+        return groupChats.filter((chat) =>
+            chat.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+    }, [groupChats, searchTerm])
+
+    const filteredDirectChats = React.useMemo(() => {
+        if (!searchTerm) return directChats
+        return directChats.filter((chat) =>
+            chat.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+    }, [directChats, searchTerm])
+
+    const handleIncomingMessage = React.useCallback((payload: SocketMessagePayload) => {
+        if (!selectedChat || payload.chatId !== selectedChat.id) {
+            return
+        }
+
+        const mappedMessage = mapSocketMessageToChatMessage(
+            payload,
+            formatDateLabel,
+            selectedChat.name ?? "Participant",
+            selectedChat.avatar,
+            adminId ?? null
+        )
+
+        const fingerprint = buildMessageFingerprint(mappedMessage.text, mappedMessage.attachments)
+        const enrichedMessage: ChatMessage = {
+            ...mappedMessage,
+            clientFingerprint: fingerprint,
+            isOptimistic: false
+        }
+
+        let appended = false
+        let replacedOptimistic = false
+
+        setMessages((prev) => {
+            // 1. Strict duplicate check by ID
+            if (prev.some((message) => message.id === enrichedMessage.id)) {
+                return prev
+            }
+
+            // 2. Optimistic replacement check
+            if (fingerprint) {
+                const optimisticIndex = prev.findIndex(
+                    (message) => message.isOptimistic && message.clientFingerprint === fingerprint
+                )
+
+                if (optimisticIndex !== -1) {
+                    replacedOptimistic = true
+                    const updated = [...prev]
+
+                    const optimisticMsg = prev[optimisticIndex]
+                    const mergedAttachments = enrichedMessage.attachments?.map((att, i) => {
+                        const optAtt = optimisticMsg.attachments?.[i]
+                        if (optAtt && att.url && !att.url.startsWith("http")) {
+                            return { ...att, url: optAtt.url }
+                        }
+                        return att
+                    })
+
+                    updated[optimisticIndex] = {
+                        ...enrichedMessage,
+                        attachments: mergedAttachments
+                    }
+                    return sortMessagesAscending(updated)
+                }
+            }
+
+            appended = true
+            return sortMessagesAscending([...prev, enrichedMessage])
+        })
+
+        if (appended || replacedOptimistic) {
+            shouldAutoScrollRef.current = true
+        }
+
+        if (appended) {
+            setMessagePagination((prev) => ({
+                ...prev,
+                offset: prev.offset + 1
+            }))
+        }
+    }, [selectedChat, formatDateLabel, adminId])
+
+    const handleMessagesScroll = React.useCallback(() => {
+        const container = messagesContainerRef.current
+        if (!container || isLoadingMoreMessages || !messagePagination.hasMore) {
+            return
+        }
+        // Small threshold to trigger load before hitting exact top
+        if (container.scrollTop <= 50) {
+            loadMoreMessages()
+        }
+    }, [isLoadingMoreMessages, messagePagination.hasMore, loadMoreMessages])
+
+    // Socket connection logic
+    React.useEffect(() => {
+        if (!adminId || !selectedChat?.id) {
+            setIsSocketConnected(false)
+            setSocketError(null)
+            if (socketRef.current) {
+                socketRef.current.disconnect()
+                socketRef.current = null
+            }
+            return
+        }
+
+        // Socket cleanup handles previous connection automatically
+        if (socketRef.current) {
+            socketRef.current.disconnect()
+        }
+
+        const trimmedBase = CHAT_SOCKET_URL.trim()
+        const baseWithoutTrailingSlash = trimmedBase.replace(/\/$/, "")
+        const socketUrl = trimmedBase
+            ? baseWithoutTrailingSlash.endsWith("/chat")
+                ? baseWithoutTrailingSlash
+                : `${baseWithoutTrailingSlash}/chat`
+            : "/chat"
+
+        const socket = io(socketUrl, {
+            query: {
+                yourId: adminId,
+                chatId: selectedChat.id,
+                userType: "admin"
+            }
+        })
+
+        socketRef.current = socket
+
+        const handleConnect = () => {
+            setIsSocketConnected(true)
+            setSocketError(null)
+        }
+
+        const handleDisconnect = () => {
+            setIsSocketConnected(false)
+        }
+
+        const handleConnectError = (error: Error) => {
+            setSocketError(error.message ?? "Failed to connect to chat server")
+        }
+
+        const handleErrorMessage = (payload: SocketErrorPayload) => {
+            setSocketError(payload?.error ?? "Chat server error")
+        }
+
+        socket.on("connect", handleConnect)
+        socket.on("disconnect", handleDisconnect)
+        socket.on("connect_error", handleConnectError)
+        socket.on("errorMessage", handleErrorMessage)
+        socket.on("newMessage", handleIncomingMessage)
+
+        return () => {
+            socket.off("connect", handleConnect)
+            socket.off("disconnect", handleDisconnect)
+            socket.off("connect_error", handleConnectError)
+            socket.off("errorMessage", handleErrorMessage)
+            socket.off("newMessage", handleIncomingMessage)
+            socket.disconnect()
+            socketRef.current = null
+        }
+    }, [adminId, selectedChat?.id, handleIncomingMessage])
+
+    // ... [Rest of your Render/Return logic remains unchanged] ...
 
     const ConversationListComponent = (
-        <ConversationList
-            groupChats={groupChats}
-            directChats={directChats}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            selectedChat={selectedChat}
-            onChatSelect={(chat) => {
-                setSelectedChat(chat)
-                if (isMobile) setSheetOpen(false)
-            }}
-            onSearchChange={() => { }}
-        />
+        <div className="flex h-full flex-col">
+            {chatListError && (
+                <div className="bg-destructive/10 text-destructive text-xs px-3 py-2">
+                    {chatListError}
+                </div>
+            )}
+            <div className="flex-1 min-h-0">
+                <ConversationList
+                    groupChats={filteredGroupChats}
+                    directChats={filteredDirectChats}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    selectedChat={selectedChat}
+                    onChatSelect={(chat) => {
+                        if (selectedChat?.id !== chat.id) {
+                            setMessages([]) // Immediate clear on manual select
+                            setSelectedChat(chat)
+                            if (isMobile) setSheetOpen(false)
+                        }
+                    }}
+                    onSearchChange={setSearchTerm}
+                />
+            </div>
+            {chatListLoading && (
+                <div className="text-muted-foreground text-xs px-3 py-2 border-t">
+                    Refreshing chats...
+                </div>
+            )}
+        </div>
     )
 
     return (
@@ -231,6 +839,7 @@ export default function ChatPage() {
                                     <div
                                         ref={messagesContainerRef}
                                         className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-muted/10"
+                                        onScroll={handleMessagesScroll}
                                     >
                                         {!selectedChat && (
                                             <p className="text-muted-foreground text-sm">
@@ -239,12 +848,37 @@ export default function ChatPage() {
                                         )}
                                         {selectedChat && (
                                             <div className="space-y-4">
-                                                {messages.length === 0 && (
+                                                {socketError && (
+                                                    <p className="text-destructive text-xs text-center">
+                                                        {socketError}
+                                                    </p>
+                                                )}
+                                                {!socketError && !isSocketConnected && (
+                                                    <p className="text-muted-foreground text-xs text-center">
+                                                        Connecting to chat server...
+                                                    </p>
+                                                )}
+                                                {loadMoreError && (
+                                                    <p className="text-destructive text-xs text-center">
+                                                        {loadMoreError}
+                                                    </p>
+                                                )}
+                                                {messagesLoading && (
+                                                    <p className="text-muted-foreground text-sm text-center py-8">
+                                                        Loading messages...
+                                                    </p>
+                                                )}
+                                                {!messagesLoading && messagesError && (
+                                                    <p className="text-destructive text-sm text-center py-8">
+                                                        {messagesError}
+                                                    </p>
+                                                )}
+                                                {!messagesLoading && !messagesError && messages.length === 0 && (
                                                     <p className="text-muted-foreground text-sm text-center py-8">
                                                         No messages yet. Start the conversation!
                                                     </p>
                                                 )}
-                                                {messages.length > 0 && (() => {
+                                                {!messagesLoading && !messagesError && messages.length > 0 && (() => {
                                                     // Group messages by date
                                                     const groupedMessages = messages.reduce((groups, message) => {
                                                         const date = message.date || "Today"
@@ -282,21 +916,8 @@ export default function ChatPage() {
                                     {selectedChat && (
                                         <ChatComposer
                                             placeholder={`Message ${selectedChat.name}`}
-                                            onSend={(message, attachments) => {
-                                                const now = new Date()
-                                                const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                const date = formatDate(now)
-                                                const newMessage = {
-                                                    id: `${now.getTime()}-${Math.random()}`,
-                                                    author: "You",
-                                                    text: message,
-                                                    time,
-                                                    date,
-                                                    me: true,
-                                                    attachments
-                                                }
-                                                setMessages(prev => [...prev, newMessage])
-                                            }}
+                                            onSend={handleSendMessage}
+                                            disabled={!isSocketConnected || messagesLoading}
                                         />
                                     )}
                                 </div>

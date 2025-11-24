@@ -57,7 +57,7 @@ export function ConversationList({
         <TabsContent value="groups" asChild>
           <ul className="flex-1 overflow-y-auto px-2 pb-3 space-y-1">
             {groupChats.map((chat) => (
-              <li key={chat.id}>
+              <li key={`group-${chat.id}`}>
                 <button
                   onClick={() => onChatSelect(chat)}
                   className={cn(
