@@ -10,7 +10,6 @@ import {
   IconUsers,
   IconCalendarEvent,
   IconMessageCircle,
-  IconRss,
   IconBell,
   IconAddressBook,
   IconGitBranch,
@@ -65,11 +64,6 @@ const data = {
       title: "Chat",
       url: "/chat",
       icon: IconMessageCircle,
-    },
-    {
-      title: "Channels",
-      url: "/channels",
-      icon: IconRss,
     },
     {
       title: "Notifications",

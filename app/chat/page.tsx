@@ -26,14 +26,17 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import apiClient from "@/utils/axios"
 
-// ... [Keep all your Type definitions here unchanged] ...
+// ----------------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------------
 
+// Updated to match your new JSON structure
 type ChatListApiItem = {
     _id: string
+    type: "private" | "group" | "channel" // New unified type
     name: string
     lastMessage?: string
     unread?: number
-    isGroup?: boolean
     profile?: string
 }
 
@@ -102,6 +105,10 @@ type SocketErrorPayload = {
     error?: string
 }
 
+// ----------------------------------------------------------------------
+// Constants & Helpers
+// ----------------------------------------------------------------------
+
 const CHAT_LIST_ENDPOINT = process.env.NEXT_PUBLIC_CHAT_LIST_URL ?? "/chat/get-list"
 const CHAT_MESSAGES_ENDPOINT = process.env.NEXT_PUBLIC_CHAT_MESSAGES_URL ?? "/chat/get-messages"
 const CHAT_MESSAGES_PAGE_SIZE = Number(process.env.NEXT_PUBLIC_CHAT_MESSAGES_LIMIT ?? 20)
@@ -159,27 +166,27 @@ const getChatErrorMessage = (error: unknown) => {
             message?: string
             response?: { data?: { message?: string } }
         }
-
         if (maybeAxiosError.isAxiosError) {
             return maybeAxiosError.response?.data?.message ?? maybeAxiosError.message ?? "Unable to load chats"
         }
-
         if ("message" in maybeAxiosError && typeof maybeAxiosError.message === "string") {
             return maybeAxiosError.message
         }
     }
-
     return "Unable to load chats"
 }
 
+// Updated mapping logic: Uses item.type directly
 const mapChatItems = (items: ChatListApiItem[] = []): ChatItem[] =>
     items.map((item) => ({
         id: item._id,
         name: item.name,
         lastMessage: item.lastMessage ?? "",
         unread: item.unread ?? 0,
-        isGroup: item.isGroup ?? false,
-        avatar: item.profile
+        isGroup: item.type === 'group',
+        avatar: item.profile,
+        // Map API "private" to UI "direct", otherwise keep "group" or "channel"
+        type: item.type === 'private' ? 'direct' : item.type 
     }))
 
 const buildMessageFingerprint = (text: string, attachments: MessageAttachment[] = []) => {
@@ -235,7 +242,6 @@ const mapSocketMessageToChatMessage = (
 const sortMessagesAscending = (messages: ChatMessage[]) =>
     [...messages].sort((a, b) => a.timestamp - b.timestamp)
 
-// --- NEW HELPER: Ensure unique messages to prevent duplicate key errors ---
 const deduplicateMessages = (messages: ChatMessage[]) => {
     const seen = new Set<string>()
     return messages.filter((msg) => {
@@ -244,6 +250,10 @@ const deduplicateMessages = (messages: ChatMessage[]) => {
         return true
     })
 }
+
+// ----------------------------------------------------------------------
+// Main Component
+// ----------------------------------------------------------------------
 
 export default function ChatPage() {
     const [adminId, setAdminId] = React.useState<string | null>(null)
@@ -259,8 +269,14 @@ export default function ChatPage() {
     const [activeTab, setActiveTab] = React.useState("groups")
     const [selectedChat, setSelectedChat] = React.useState<ChatItem | null>(null)
     const [sheetOpen, setSheetOpen] = React.useState(false)
+    
     const [groupChats, setGroupChats] = React.useState<ChatItem[]>([])
     const [directChats, setDirectChats] = React.useState<ChatItem[]>([])
+    const [channelChats, setChannelChats] = React.useState<ChatItem[]>([])
+    
+    // Single Ref to track the entire API response state
+    const lastApiDataRef = React.useRef<string>("")
+
     const [chatListLoading, setChatListLoading] = React.useState(false)
     const [chatListError, setChatListError] = React.useState<string | null>(null)
     const [searchTerm, setSearchTerm] = React.useState("")
@@ -276,12 +292,11 @@ export default function ChatPage() {
     const [socketError, setSocketError] = React.useState<string | null>(null)
     const [isSocketConnected, setIsSocketConnected] = React.useState(false)
 
-    // Ref for messages container to auto-scroll
     const messagesContainerRef = React.useRef<HTMLDivElement>(null)
     const socketRef = React.useRef<Socket | null>(null)
     const shouldAutoScrollRef = React.useRef(true)
+    const activeChatIdRef = React.useRef<string | null>(null)
 
-    // Helper function to format date
     const formatDateLabel = React.useCallback((date: Date) => {
         const today = new Date()
         const yesterday = new Date(today)
@@ -301,35 +316,30 @@ export default function ChatPage() {
         })
     }, [])
 
-    // --- FIXED: Cleanup on Tab Change to prevent old messages showing ---
+    // --- Cleanup on Tab Change ---
     React.useEffect(() => {
         setMessages([])
+        activeChatIdRef.current = null
         setMessagesError(null)
         setLoadMoreError(null)
         setMessagePagination({ offset: 0, hasMore: true })
         setIsLoadingMoreMessages(false)
         setMessagesLoading(false)
-        // Note: We don't set selectedChat(null) here strictly if we want to preserve selection logic below
     }, [activeTab])
 
-    // Auto-scroll to bottom when messages change
     React.useEffect(() => {
         const container = messagesContainerRef.current
         if (!container) return
-
         if (shouldAutoScrollRef.current) {
             container.scrollTop = container.scrollHeight
         }
-        // Reset auto-scroll unless explicitly requested
-        // We only set this to false when loading PREVIOUS messages
     }, [messages])
 
+    // --- NEW: Unified Fetch Logic ---
     React.useEffect(() => {
         let isMounted = true
         let intervalId: NodeJS.Timeout
 
-        // We accept a 'showLoading' flag. 
-        // We set it to false for the 3-second background updates.
         const fetchChatLists = async (showLoading = true) => {
             if (showLoading) {
                 setChatListLoading(true)
@@ -337,25 +347,34 @@ export default function ChatPage() {
             }
             
             try {
-                const [groupResponse, directResponse] = await Promise.all([
-                    apiClient.post<ChatListResponse>(CHAT_LIST_ENDPOINT, { type: "group" }),
-                    apiClient.post<ChatListResponse>(CHAT_LIST_ENDPOINT, { type: "private" })
-                ])
+                // 1. Single API Call
+                const response = await apiClient.post<ChatListResponse>(CHAT_LIST_ENDPOINT)
 
                 if (!isMounted) return
 
-                const mappedGroups = mapChatItems(groupResponse.data?.data)
-                const mappedDirect = mapChatItems(directResponse.data?.data)
+                const rawData = response.data?.data || []
+                const rawDataStr = JSON.stringify(rawData)
 
-                setGroupChats(mappedGroups)
-                setDirectChats(mappedDirect)
+                // 2. Compare with last known string
+                if (rawDataStr !== lastApiDataRef.current) {
+                    
+                    // 3. Client-side filtering based on 'type'
+                    const allMapped = mapChatItems(rawData)
+
+                    const groups = allMapped.filter(c => c.type === 'group')
+                    const directs = allMapped.filter(c => c.type === 'direct') // Mapped from 'private'
+                    const channels = allMapped.filter(c => c.type === 'channel')
+
+                    setGroupChats(groups)
+                    setDirectChats(directs)
+                    setChannelChats(channels)
+
+                    // Update ref
+                    lastApiDataRef.current = rawDataStr
+                }
                 
-                // Note: We don't force selection changes here to prevent 
-                // the active chat from jumping around while the user is typing.
-
             } catch (error) {
                 if (!isMounted) return
-                // Only show error on the initial load to avoid annoying popups during background sync
                 if (showLoading) {
                     setChatListError(getChatErrorMessage(error))
                 }
@@ -366,29 +385,33 @@ export default function ChatPage() {
             }
         }
 
-        // 1. Initial Load (Shows Spinner)
+        // Initial Load
         fetchChatLists(true)
 
-        // 2. Set up the 3-second interval (Silent Background Update)
+        // Poll every 1.5s
         intervalId = setInterval(() => {
             fetchChatLists(false)
         }, 1500)
 
-        // Cleanup: Stop the timer and mark as unmounted when tab changes or component unmounts
         return () => {
             isMounted = false
             clearInterval(intervalId)
         }
-    }, [activeTab])
+    }, [])
 
-    // --- FIXED: Messages Fetching Logic ---
+    // --- Message Fetching (Guarded) ---
     React.useEffect(() => {
         if (!selectedChat) {
             setMessages([])
+            activeChatIdRef.current = null
             return
         }
 
-        // 1. Synchronous Clear: Immediately clear messages to prevent ghosting/flashing
+        if (selectedChat.id === activeChatIdRef.current) {
+            return
+        }
+
+        activeChatIdRef.current = selectedChat.id
         setMessages([])
         setMessagesError(null)
         setMessagePagination({ offset: 0, hasMore: true })
@@ -406,6 +429,7 @@ export default function ChatPage() {
                 })
 
                 if (!isMounted) return
+                if (selectedChat.id !== activeChatIdRef.current) return
 
                 const mappedMessages = (response.data?.data ?? []).map((item) =>
                     mapMessageFromApi(item, formatDateLabel, selectedChat.avatar)
@@ -418,7 +442,6 @@ export default function ChatPage() {
                 }))
 
                 shouldAutoScrollRef.current = true
-                // 2. Deduplicate just in case API sends dups
                 setMessages(sortMessagesAscending(deduplicateMessages(normalizedMessages)))
                 setMessagePagination({
                     offset: normalizedMessages.length,
@@ -439,33 +462,39 @@ export default function ChatPage() {
         return () => {
             isMounted = false
         }
-    }, [selectedChat?.id, formatDateLabel]) // Dependency on ID is safer than object
+    }, [selectedChat?.id, formatDateLabel])
 
+    // --- Selection Sync ---
     React.useEffect(() => {
-        const chatsInTab = activeTab === "groups" ? groupChats : directChats
-        if (chatsInTab.length === 0) {
-            // Don't nullify if we are loading, only if the list is truly empty after load
-            if (!chatListLoading && selectedChat !== null && !groupChats.find(c => c.id === selectedChat.id) && !directChats.find(c => c.id === selectedChat.id)) {
-                setSelectedChat(null)
-            }
-            return
-        }
+        let chatsInTab: ChatItem[] = []
+        if (activeTab === "groups") chatsInTab = groupChats
+        else if (activeTab === "channels") chatsInTab = channelChats
+        else chatsInTab = directChats
 
-        const stillExists = chatsInTab.some((chat) => chat.id === selectedChat?.id)
-        if (!stillExists) {
+        if (chatsInTab.length === 0) return
+
+        if (selectedChat) {
+            const foundChat = chatsInTab.find((chat) => chat.id === selectedChat.id)
+            if (foundChat) {
+                if (foundChat !== selectedChat) {
+                    setSelectedChat(foundChat)
+                }
+            } else {
+                if (!chatListLoading) {
+                    setSelectedChat(chatsInTab[0])
+                }
+            }
+        } else {
             setSelectedChat(chatsInTab[0])
         }
-    }, [activeTab, groupChats, directChats])
+    }, [activeTab, groupChats, directChats, channelChats, chatListLoading, selectedChat])
 
     const loadMoreMessages = React.useCallback(async () => {
-        if (!selectedChat || !messagePagination.hasMore || isLoadingMoreMessages) {
-            return
-        }
+        if (!selectedChat || !messagePagination.hasMore || isLoadingMoreMessages) return
 
         setIsLoadingMoreMessages(true)
         setLoadMoreError(null)
 
-        // Capture scroll position before update
         const container = messagesContainerRef.current
         const previousScrollHeight = container?.scrollHeight ?? 0
         const previousScrollTop = container?.scrollTop ?? 0
@@ -489,11 +518,8 @@ export default function ChatPage() {
 
             shouldAutoScrollRef.current = false
 
-            // --- FIXED: Deduplication logic here prevents Key Error ---
             setMessages((prev) => {
-                // Combine new (older history) messages with existing messages
                 const combined = [...normalizedMessages, ...prev]
-                // Remove duplicates based on ID (Socket vs API race condition fix)
                 const unique = deduplicateMessages(combined)
                 return sortMessagesAscending(unique)
             })
@@ -503,7 +529,6 @@ export default function ChatPage() {
                 hasMore: normalizedMessages.length === CHAT_MESSAGES_PAGE_SIZE
             }))
 
-            // Restore scroll position relative to bottom
             requestAnimationFrame(() => {
                 if (messagesContainerRef.current) {
                     const newScrollHeight = messagesContainerRef.current.scrollHeight
@@ -533,9 +558,7 @@ export default function ChatPage() {
             size: attachment.size
         }))
 
-        if (!trimmedMessage && mappedAttachments.length === 0) {
-            return
-        }
+        if (!trimmedMessage && mappedAttachments.length === 0) return
 
         const now = new Date()
         const fingerprint = buildMessageFingerprint(trimmedMessage, mappedAttachments)
@@ -577,22 +600,21 @@ export default function ChatPage() {
 
     const filteredGroupChats = React.useMemo(() => {
         if (!searchTerm) return groupChats
-        return groupChats.filter((chat) =>
-            chat.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        return groupChats.filter((chat) => chat.name.toLowerCase().includes(searchTerm.toLowerCase()))
     }, [groupChats, searchTerm])
 
     const filteredDirectChats = React.useMemo(() => {
         if (!searchTerm) return directChats
-        return directChats.filter((chat) =>
-            chat.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
+        return directChats.filter((chat) => chat.name.toLowerCase().includes(searchTerm.toLowerCase()))
     }, [directChats, searchTerm])
 
+    const filteredChannelChats = React.useMemo(() => {
+        if (!searchTerm) return channelChats
+        return channelChats.filter((chat) => chat.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    }, [channelChats, searchTerm])
+
     const handleIncomingMessage = React.useCallback((payload: SocketMessagePayload) => {
-        if (!selectedChat || payload.chatId !== selectedChat.id) {
-            return
-        }
+        if (!selectedChat || payload.chatId !== selectedChat.id) return
 
         const mappedMessage = mapSocketMessageToChatMessage(
             payload,
@@ -613,12 +635,8 @@ export default function ChatPage() {
         let replacedOptimistic = false
 
         setMessages((prev) => {
-            // 1. Strict duplicate check by ID
-            if (prev.some((message) => message.id === enrichedMessage.id)) {
-                return prev
-            }
+            if (prev.some((message) => message.id === enrichedMessage.id)) return prev
 
-            // 2. Optimistic replacement check
             if (fingerprint) {
                 const optimisticIndex = prev.findIndex(
                     (message) => message.isOptimistic && message.clientFingerprint === fingerprint
@@ -627,7 +645,6 @@ export default function ChatPage() {
                 if (optimisticIndex !== -1) {
                     replacedOptimistic = true
                     const updated = [...prev]
-
                     const optimisticMsg = prev[optimisticIndex]
                     const mergedAttachments = enrichedMessage.attachments?.map((att, i) => {
                         const optAtt = optimisticMsg.attachments?.[i]
@@ -651,28 +668,21 @@ export default function ChatPage() {
 
         if (appended || replacedOptimistic) {
             shouldAutoScrollRef.current = true
-        }
-
-        if (appended) {
-            setMessagePagination((prev) => ({
-                ...prev,
-                offset: prev.offset + 1
-            }))
+            if (appended) {
+                setMessagePagination((prev) => ({
+                    ...prev,
+                    offset: prev.offset + 1
+                }))
+            }
         }
     }, [selectedChat, formatDateLabel, adminId])
 
     const handleMessagesScroll = React.useCallback(() => {
         const container = messagesContainerRef.current
-        if (!container || isLoadingMoreMessages || !messagePagination.hasMore) {
-            return
-        }
-        // Small threshold to trigger load before hitting exact top
-        if (container.scrollTop <= 50) {
-            loadMoreMessages()
-        }
+        if (!container || isLoadingMoreMessages || !messagePagination.hasMore) return
+        if (container.scrollTop <= 50) loadMoreMessages()
     }, [isLoadingMoreMessages, messagePagination.hasMore, loadMoreMessages])
 
-    // Socket connection logic
     React.useEffect(() => {
         if (!adminId || !selectedChat?.id) {
             setIsSocketConnected(false)
@@ -684,10 +694,7 @@ export default function ChatPage() {
             return
         }
 
-        // Socket cleanup handles previous connection automatically
-        if (socketRef.current) {
-            socketRef.current.disconnect()
-        }
+        if (socketRef.current) socketRef.current.disconnect()
 
         const trimmedBase = CHAT_SOCKET_URL.trim()
         const baseWithoutTrailingSlash = trimmedBase.replace(/\/$/, "")
@@ -711,18 +718,9 @@ export default function ChatPage() {
             setIsSocketConnected(true)
             setSocketError(null)
         }
-
-        const handleDisconnect = () => {
-            setIsSocketConnected(false)
-        }
-
-        const handleConnectError = (error: Error) => {
-            setSocketError(error.message ?? "Failed to connect to chat server")
-        }
-
-        const handleErrorMessage = (payload: SocketErrorPayload) => {
-            setSocketError(payload?.error ?? "Chat server error")
-        }
+        const handleDisconnect = () => setIsSocketConnected(false)
+        const handleConnectError = (error: Error) => setSocketError(error.message ?? "Failed to connect to chat server")
+        const handleErrorMessage = (payload: SocketErrorPayload) => setSocketError(payload?.error ?? "Chat server error")
 
         socket.on("connect", handleConnect)
         socket.on("disconnect", handleDisconnect)
@@ -741,9 +739,7 @@ export default function ChatPage() {
         }
     }, [adminId, selectedChat?.id, handleIncomingMessage])
 
-    // ... [Rest of your Render/Return logic remains unchanged] ...
-
-    const ConversationListComponent = (
+    const ConversationListComponent = React.useMemo(() => (
         <div className="flex h-full flex-col">
             {chatListError && (
                 <div className="bg-destructive/10 text-destructive text-xs px-3 py-2">
@@ -754,12 +750,13 @@ export default function ChatPage() {
                 <ConversationList
                     groupChats={filteredGroupChats}
                     directChats={filteredDirectChats}
+                    channelChats={filteredChannelChats}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
                     selectedChat={selectedChat}
                     onChatSelect={(chat) => {
                         if (selectedChat?.id !== chat.id) {
-                            setMessages([]) // Immediate clear on manual select
+                            setMessages([])
                             setSelectedChat(chat)
                             if (isMobile) setSheetOpen(false)
                         }
@@ -773,7 +770,7 @@ export default function ChatPage() {
                 </div>
             )}
         </div>
-    )
+    ), [chatListError, filteredGroupChats, filteredDirectChats, filteredChannelChats, activeTab, selectedChat, isMobile, chatListLoading])
 
     return (
         <SidebarProvider
@@ -790,15 +787,12 @@ export default function ChatPage() {
                     <div className="@container/main flex flex-1 flex-col">
                         <div className="flex flex-col">
                             <div className="flex h-dvh flex-col md:flex-row overflow-hidden">
-                                {/* Desktop list */}
                                 <aside className="hidden w-72 shrink-0 border-r md:flex md:flex-col bg-background/50">
                                     {ConversationListComponent}
                                 </aside>
 
-                                {/* Mobile trigger */}
                                 {isMobile && (
                                     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                                        {/* Mobile header with details dialog trigger */}
                                         <div className="flex items-center justify-between border-b px-4 py-3 gap-2 md:hidden sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                                             <SidebarTrigger className="-ml-1" />
                                             <ChatHeader
@@ -826,16 +820,13 @@ export default function ChatPage() {
                                     </Sheet>
                                 )}
 
-                                {/* Conversation area */}
                                 <div className="flex flex-1 flex-col min-w-0 min-h-0">
-                                    {/* Desktop header */}
                                     {!isMobile && (
                                         <ChatHeader
                                             selectedChat={selectedChat}
                                             activeTab={activeTab}
                                         />
                                     )}
-                                    {/* Messages */}
                                     <div
                                         ref={messagesContainerRef}
                                         className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-muted/10"
@@ -879,7 +870,6 @@ export default function ChatPage() {
                                                     </p>
                                                 )}
                                                 {!messagesLoading && !messagesError && messages.length > 0 && (() => {
-                                                    // Group messages by date
                                                     const groupedMessages = messages.reduce((groups, message) => {
                                                         const date = message.date || "Today"
                                                         if (!groups[date]) {
@@ -912,7 +902,6 @@ export default function ChatPage() {
                                             </div>
                                         )}
                                     </div>
-                                    {/* Composer */}
                                     {selectedChat && (
                                         <ChatComposer
                                             placeholder={`Message ${selectedChat.name}`}

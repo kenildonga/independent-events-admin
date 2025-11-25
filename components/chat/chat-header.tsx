@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { UsersIcon } from "lucide-react"
+import { UsersIcon, MegaphoneIcon } from "lucide-react"
 import { ChatDetails, type ChatItem } from "@/components/chat/chat-details"
 
 interface ChatHeaderProps {
@@ -25,6 +25,8 @@ export function ChatHeader({ selectedChat, activeTab, isMobile }: ChatHeaderProp
               <AvatarFallback className="text-xs">
                 {activeTab === "groups" || selectedChat?.isGroup ? (
                   <UsersIcon className="size-4" />
+                ) : activeTab === "channels" ? (
+                  <MegaphoneIcon className="size-4" />
                 ) : (
                   (selectedChat?.name || "").split(" ").map(n => n[0]).join("").slice(0, 2)
                 )}
@@ -37,7 +39,7 @@ export function ChatHeader({ selectedChat, activeTab, isMobile }: ChatHeaderProp
                     {selectedChat?.name ?? "Chat"}
                   </h1>
                   <span className="text-muted-foreground text-xs truncate hidden sm:inline">
-                    {activeTab === "groups" ? "Group" : "Direct"}
+                    {activeTab === "groups" ? "Group" : activeTab === "channels" ? "Channel" : "Direct"}
                   </span>
                 </>
               ) : (
@@ -46,7 +48,7 @@ export function ChatHeader({ selectedChat, activeTab, isMobile }: ChatHeaderProp
                     {selectedChat?.name}
                   </h2>
                   <p className="text-muted-foreground text-xs">
-                    {activeTab === "groups" ? "Group chat" : "Direct message"}
+                    {activeTab === "groups" ? "Group chat" : activeTab === "channels" ? "Channel" : "Direct message"}
                   </p>
                 </>
               )}
