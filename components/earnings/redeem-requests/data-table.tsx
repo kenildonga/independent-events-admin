@@ -7,8 +7,7 @@ import {
   IconChevronsLeft,
   IconChevronsRight,
   IconCheck,
-  IconX,
-  IconCoins
+  IconX
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -36,29 +35,37 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import dayjs from "dayjs";
+import ShowSidebar from "@/components/users/show-sidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export const schema = z.object({
-  id: z.number(),
-  username: z.string(),
-  datetime: z.string(),
-  convertRate: z.number(),
+  _id: z.string(),
+  userId: z.string().optional(),
+  userName: z.string(),
+  createdAt: z.string(),
+  conversionRate: z.number(),
   status: z.enum(["approved", "pending", "rejected"]),
   points: z.number(),
+  totalValue: z.number(),
+  statusUpdatedAt: z.string().optional(),
 });
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => {
-      return row.original.id
-    },
+    id: "rowNumber",
+    header: "#",
+    cell: ({ row }) => row.index + 1,
     enableHiding: false,
   },
   {
-    accessorKey: "username",
-    header: "User name",
-    cell: ({ row }) => row.original.username,
+    accessorKey: "name",
+    header: "Name",
+    cell: ({ row }) => {
+      return (
+        <TableCellViewer userId={row.original.userId || ""} name={row.original.userName} />
+      )
+    },
     enableHiding: false,
   },
   {
@@ -80,15 +87,14 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     ),
   },
   {
-    accessorKey: "datetime",
+    accessorKey: "createdAt",
     header: "Date",
-    cell: ({ row }) => {
-      const formatter = new Intl.DateTimeFormat(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-      return formatter.format(new Date(row.original.datetime))
-    },
+    cell: ({ row }) => dayjs(row.original.createdAt).format("YYYY-MM-DD hh:mm A")
+  },
+  {
+    accessorKey: "statusUpdatedAt",
+    header: "Status Updated",
+    cell: ({ row }) => dayjs(row.original.statusUpdatedAt).format("YYYY-MM-DD hh:mm A")
   },
   {
     accessorKey: "points",
@@ -96,56 +102,53 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     cell: ({ row }) => {
       const isCredit = row.original.status === "rejected"
       const formattedPoints = `${isCredit ? "+" : "-"}${Math.abs(row.original.points)}`
-
       return (
-        <div
-          className={
-            "text-center font-medium " +
-            (isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")
-          }
-        >
+        <div className={`text-center font-mono ${isCredit ? 'text-emerald-600' : 'text-rose-600'}`}>
           {formattedPoints}
         </div>
       )
     },
   },
   {
-    accessorKey: "convertRate",
+    accessorKey: "totalValue",
     header: () => <div className="text-center">Converted Value</div>,
-    cell: ({ row }) => <p className="text-center">&#8377;{row.original.convertRate}</p>,
+    cell: ({ row }) => <p className="text-center">&#8377;{row.original.totalValue}</p>,
   },
   {
     id: "actions",
     header: () => <div className="text-center">Actions</div>,
-    cell: () => (
-      <div className="justify-center flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
-        >
-          <IconCheck />
-          <span className="sr-only">Edit</span>
-        </Button>
-        <Button
-          variant="destructive"
-          size="icon"
-        >
-          <IconX />
-          <span className="sr-only">Delete</span>
-        </Button>
-      </div>
+    cell: ({ row }) => (
+      <>
+        {row.original.status === "pending" ? (
+          <div className="justify-center flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
+            >
+              <IconCheck />
+              <span className="sr-only">Edit</span>
+            </Button>
+            <Button
+              variant="destructive"
+              size="icon"
+            >
+              <IconX />
+              <span className="sr-only">Delete</span>
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-center">-- No Actions --</div>
+        )}
+      </>
     ),
   },
 ]
-
 export function DataTable({
-  data: initialData,
+  data,
 }: {
   data: z.infer<typeof schema>[]
 }) {
-  const [data, setData] = React.useState(() => [...initialData])
-
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 10,
@@ -157,24 +160,17 @@ export function DataTable({
     state: {
       pagination,
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => row._id,
     enableRowSelection: true,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   })
-
   const rowModel = table.getRowModel()
 
   return (
     <>
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <div className="items-center gap-2">
-          <p className="flex text-green-700 border-green-300">
-            Point Value is &nbsp;<IconCoins />1 = &#8377;0.50
-          </p>
-        </div>
-      </div>
+
       <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
 
@@ -303,5 +299,15 @@ export function DataTable({
         </div>
       </div>
     </>
+  )
+}
+
+
+function TableCellViewer({ userId, name }: { userId: string; name: string }) {
+
+  const isMobile = useIsMobile()
+
+  return (
+    <ShowSidebar userId={userId} isMobile={isMobile} fallbackName={name} />
   )
 }

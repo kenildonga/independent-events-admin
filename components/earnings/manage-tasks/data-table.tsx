@@ -2,8 +2,8 @@
 
 import * as React from "react"
 import {
-  IconCheck,
-  IconX
+  IconEdit,
+  IconTrash
 } from "@tabler/icons-react"
 
 import {
@@ -15,6 +15,8 @@ import {
 
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 
 import {
   Table,
@@ -26,90 +28,131 @@ import {
 } from "@/components/ui/table"
 
 export const schema = z.object({
-  _id: z.number(),
+  _id: z.string(),
+  taskName: z.string(),
+  point: z.number(),
   question: z.string(),
   answer: z.string(),
-  options: z.array(z.string()),
-  updatedAt: z.string(),
+  options: z.object().catchall(z.string()),
+  isActive: z.boolean(),
 });
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
-  {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => {
-      return <p>{row.original._id}</p>
-    },
-    enableHiding: false,
-  },
-  {
-    accessorKey: "question",
-    header: "Question",
-    cell: ({ row }) => row.original.question,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "updatedAt",
-    header: "Last Updated",
-    cell: ({ row }) => {
-      const formatter = new Intl.DateTimeFormat(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-      return formatter.format(new Date(row.original.updatedAt))
-    },
-  },
-  {
-    accessorKey: "options",
-    header: "Options",
-    cell: ({ row }) => (
-      <div>
-        {row.original.options.map((option, index) => (
-          <p key={index}>{option}</p>
-        ))}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "answer",
-    header: () => <div className="text-center">Redeem Points</div>,
-    cell: ({ row }) => <p className="text-center">{row.original.answer}</p>,
-  },
-  {
-    id: "actions",
-    header: () => <div className="text-center">Actions</div>,
-    cell: () => (
-      <div className="justify-center flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
-        >
-          <IconCheck />
-          <span className="sr-only">Edit</span>
-        </Button>
-        <Button
-          variant="destructive"
-          size="icon"
-        >
-          <IconX />
-          <span className="sr-only">Delete</span>
-        </Button>
-      </div>
-    ),
-  },
-]
+export type Task = z.infer<typeof schema>
 
 export function DataTable({
-  data,
+  data: initialData,
+  isLoading = false,
+  onEdit,
+  onDelete,
+  onStatusChange,
 }: {
-  data: z.infer<typeof schema>[]
+  data: Task[]
+  isLoading?: boolean
+  onEdit?: (task: Task) => void
+  onDelete?: (taskId: string) => void
+  onStatusChange?: (taskId: string, isActive: boolean) => void
 }) {
+  const [data, setData] = React.useState<Task[]>(initialData)
+
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
+
+  const updateStatus = (_id: string, isActive: boolean) => {
+    setData(prev => prev.map(task => task._id === _id ? { ...task, isActive } : task))
+    if (onStatusChange) {
+      onStatusChange(_id, isActive)
+    }
+  }
+
+  const columns: ColumnDef<Task>[] = [
+    {
+      id: "rowNumber",
+      header: "#",
+      cell: ({ row }) => row.index + 1,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "taskName",
+      header: "Task Name",
+      enableHiding: false,
+    },
+    {
+      accessorKey: "point",
+      header: "Points",
+    },
+    {
+      accessorKey: "question",
+      header: "Question",
+      enableHiding: false,
+    },
+    {
+      accessorKey: "options",
+      header: "Options",
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-1">
+          {Object.entries(row.original.options).map(([key, value]) => (
+            <span key={key} className="text-xs whitespace-nowrap">
+              <span className="font-semibold">{key}:</span> {value}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "answer",
+      header: "Answer",
+      cell: ({ row }) => <p>{row.original.answer}</p>,
+    },
+    {
+      accessorKey: "isActive",
+      header: "Status",
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? "default" : "secondary"} className={row.original.isActive ? "bg-green-100 text-green-800 hover:bg-green-100/80" : "bg-red-100 text-red-800 hover:bg-red-100/80"}>
+          {row.original.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <div className="text-center">Actions</div>,
+      cell: ({ row }) => (
+        <div className="justify-center flex items-center gap-2">
+          <Switch
+            checked={row.original.isActive}
+            disabled={isLoading}
+            onCheckedChange={(checked) => {
+              updateStatus(row.original._id, checked)
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
+            aria-label="Edit"
+            onClick={() => onEdit && onEdit(row.original)}
+          >
+            <IconEdit />
+            <span className="sr-only">Edit</span>
+          </Button>
+          <Button 
+            variant="destructive" 
+            size="icon" 
+            aria-label="Delete"
+            onClick={() => onDelete && onDelete(row.original._id)}
+          >
+            <IconTrash />
+            <span className="sr-only">Delete</span>
+          </Button>
+        </div>
+      ),
+    },
+  ]
 
   const table = useReactTable({
     data,
     columns,
-    getRowId: (row) => row._id.toString(),
+    getRowId: (row) => row._id,
     enableRowSelection: true,
     getCoreRowModel: getCoreRowModel(),
   })

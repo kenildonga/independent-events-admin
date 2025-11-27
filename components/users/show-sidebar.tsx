@@ -133,11 +133,11 @@ export default function ShowSidebar({ userId, isMobile, fallbackName }: ShowSide
           return;
         }
 
-        if (response.data?.code === 1 && response.data?.data) {
+        if (response.data?.code === 1 && response.data.data) {
           setUser(response.data.data);
         } else {
           setUser(null);
-          setError(response.data?.message || "Unable to load user details.");
+          setError("Unable to load user details.");
         }
       } catch (err) {
         if (!isMounted) {

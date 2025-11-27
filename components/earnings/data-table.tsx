@@ -7,8 +7,6 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconPencil,
-  IconTrash,
 } from "@tabler/icons-react"
 
 import {
@@ -26,6 +24,7 @@ import { z } from "zod"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import dayjs from "dayjs";
 
 import {
   Select,
@@ -50,28 +49,30 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import ShowSidebar from "../users/show-sidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export const schema = z.object({
-  id: z.number(),
-  username: z.string(),
+  _id: z.string(),
+  userId: z.string().optional(),
+  userName: z.string(),
   type: z.enum(["credit", "debit"]),
-  datetime: z.string(),
-  points: z.number(),
+  createdAt: z.string(),
+  pointsChange: z.number(),
+  note: z.string(),
 })
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => {
-      return row.original.id
-    },
+    id: "rowNumber",
+    header: "#",
+    cell: ({ row }) => <span className="text-muted-foreground">{row.index + 1}</span>,
     enableHiding: false,
   },
   {
-    accessorKey: "username",
+    accessorKey: "userName",
     header: "User name",
-    cell: ({ row }) => row.original.username,
+    cell: ({ row }) => <TableCellViewer userId={row.original.userId || ""} name={row.original.userName} />,
     enableHiding: false,
   },
   {
@@ -91,27 +92,26 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
     ),
   },
   {
-    accessorKey: "datetime",
-    header: "Date",
-    cell: ({ row }) => {
-      const formatter = new Intl.DateTimeFormat(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-      return formatter.format(new Date(row.original.datetime))
-    },
+    accessorKey: "note",
+    header: "Note",
+    cell: ({ row }) => <span className="text-muted-foreground">{row.original.note}</span>,
   },
   {
-    accessorKey: "points",
-    header: () => <div className="text-right">Points</div>,
+    accessorKey: "createdAt",
+    header: "Date",
+    cell: ({ row }) => dayjs(row.original.createdAt).format('YYYY-MM-DD hh:mm A'),
+  },
+  {
+    accessorKey: "pointsChange",
+    header: () => <div className="text-left">Points</div>,
     cell: ({ row }) => {
       const isCredit = row.original.type === "credit"
-      const formattedPoints = `${isCredit ? "+" : "-"}${Math.abs(row.original.points)}`
+      const formattedPoints = `${isCredit ? "+" : "-"}${Math.abs(row.original.pointsChange)}`
 
       return (
         <div
           className={
-            "text-right font-medium " +
+            "text-left font-medium " +
             (isCredit ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")
           }
         >
@@ -119,30 +119,7 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         </div>
       )
     },
-  },
-  {
-    id: "actions",
-    header: "Actions",
-    cell: () => (
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
-        >
-          <IconPencil />
-          <span className="sr-only">Edit</span>
-        </Button>
-        <Button
-          variant="destructive"
-          size="icon"
-        >
-          <IconTrash />
-          <span className="sr-only">Delete</span>
-        </Button>
-      </div>
-    ),
-  },
+  }
 ]
 
 function TableRowComponent({ row }: { row: Row<z.infer<typeof schema>> }) {
@@ -158,13 +135,10 @@ function TableRowComponent({ row }: { row: Row<z.infer<typeof schema>> }) {
 }
 
 export function DataTable({
-  data: initialData,
+  data
 }: {
   data: z.infer<typeof schema>[]
 }) {
-  const [data, setData] = React.useState(() => initialData)
-  const [rowSelection, setRowSelection] = React.useState({})
-
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
@@ -183,9 +157,8 @@ export function DataTable({
       columnFilters,
       pagination,
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => row._id.toString(),
     enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
     onColumnFiltersChange: setColumnFilters,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
@@ -388,4 +361,11 @@ export function DataTable({
       </TabsContent>
     </Tabs>
   )
+}
+
+function TableCellViewer({ userId, name }: { userId: string; name: string }) {
+    const isMobile = useIsMobile()
+    return (
+        <ShowSidebar userId={userId} isMobile={isMobile} fallbackName={name} />
+    )
 }
