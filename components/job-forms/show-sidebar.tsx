@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button"
+import { IconEye } from "@tabler/icons-react"
 import {
   Drawer,
   DrawerContent,
@@ -17,7 +18,10 @@ export default function ShowSidebar({ item, isMobile }: { item: any; isMobile: b
   return (
     <Drawer direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild>
-        <Button variant="link">View</Button>
+        <Button variant="ghost" size="icon" className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70">
+          <IconEye />
+          <span className="sr-only">View</span>
+        </Button>
       </DrawerTrigger>
       <DrawerContent>
         <DrawerHeader className="gap-1">
@@ -52,11 +56,26 @@ export default function ShowSidebar({ item, isMobile }: { item: any; isMobile: b
               </div>
               <div>
                 <Label className="text-xs font-medium text-muted-foreground">Salary Range</Label>
-                <p className="text-sm">{item.salaryRange}</p>
+                <p className="text-sm">${item.salaryStart?.toLocaleString()} - ${item.salaryEnd?.toLocaleString()}</p>
               </div>
               <div>
-                <Label className="text-xs font-medium text-muted-foreground">Date & Time</Label>
-                <p className="text-sm">{item.datetime}</p>
+                <Label className="text-xs font-medium text-muted-foreground">Created At</Label>
+                <p className="text-sm">{new Date(item.createdAt).toLocaleString()}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground">Status</Label>
+                <p className="text-sm">{item.isActive ? "Active" : "Inactive"}</p>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-muted-foreground">Application Link</Label>
+                <a
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 underline"
+                >
+                  Apply Here
+                </a>
               </div>
             </div>
           </div>

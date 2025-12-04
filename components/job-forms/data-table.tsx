@@ -1,36 +1,24 @@
 "use client"
 
 import * as React from "react"
-
 import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
+  IconEdit,
+  IconTrash
 } from "@tabler/icons-react"
 
 import {
   ColumnDef,
   flexRender,
   getCoreRowModel,
-  getPaginationRowModel,
-  Row,
   useReactTable,
 } from "@tanstack/react-table"
 
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { useIsMobile } from "@/hooks/use-mobile"
 import ShowSidebar from "./show-sidebar"
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 import {
   Table,
@@ -42,246 +30,208 @@ import {
 } from "@/components/ui/table"
 
 export const schema = z.object({
-  id: z.number(),
-  companyName: z.string(),
+  _id: z.string(),
   jobTitle: z.string(),
+  companyName: z.string(),
   location: z.string(),
-  salaryRange: z.string(),
   jobType: z.string(),
   description: z.string(),
-  datetime: z.string(),
-  formLink: z.string(),
+  salaryStart: z.number(),
+  salaryEnd: z.number(),
+  link: z.string(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
 })
 
-const TableCellViewer = ({ item }: { item: z.infer<typeof schema> }) => {
-  const isMobile = useIsMobile()
-  return (
-    <div className="flex gap-2">
-      <Button variant="link">Edit</Button>
-      <ShowSidebar item={item} isMobile={isMobile} />
-    </div>
-  )
-}
+export type JobForm = z.infer<typeof schema>
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
-  {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => {
-      return row.original.id
+export function DataTable({
+  data: initialData,
+  isLoading = false,
+  onEdit,
+  onDelete,
+  onStatusChange,
+}: {
+  data: JobForm[]
+  isLoading?: boolean
+  onEdit?: (jobForm: JobForm) => void
+  onDelete?: (formId: string) => void
+  onStatusChange?: (formId: string, isActive: boolean) => void
+}) {
+  const [data, setData] = React.useState<JobForm[]>(initialData)
+  const isMobile = useIsMobile()
+
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
+
+  const updateStatus = (_id: string, isActive: boolean) => {
+    setData(prev => prev.map(form => form._id === _id ? { ...form, isActive } : form))
+    if (onStatusChange) {
+      onStatusChange(_id, isActive)
+    }
+  }
+
+  const columns: ColumnDef<JobForm>[] = [
+    {
+      id: "rowNumber",
+      header: "#",
+      cell: ({ row }) => row.index + 1,
+      enableHiding: false,
     },
-    enableHiding: false,
-  },
-  {
-    accessorKey: "companyName",
-    header: "Company Name",
-    cell: ({ row }) => {
-      return row.original.companyName
+    {
+      accessorKey: "companyName",
+      header: "Company Name",
+      enableHiding: false,
     },
-  },
-  {
-    accessorKey: "jobTitle",
-    header: "Job Title",
-    cell: ({ row }) => {
-      return row.original.jobTitle
+    {
+      accessorKey: "jobTitle",
+      header: "Job Title",
+      enableHiding: false,
     },
-  },
-  {
-    accessorKey: "jobType",
-    header: "Job Type",
-    cell: ({ row }) => {
-      return row.original.jobType
+    {
+      accessorKey: "location",
+      header: "Location",
     },
-  },
-  {
-    accessorKey: "datetime",
-    header: "Date & Time",
-    cell: ({ row }) => {
-      return row.original.datetime
+    {
+      accessorKey: "jobType",
+      header: "Job Type",
     },
-  },
-  {
-    accessorKey: "formLink",
-    header: "Form Link",
-    cell: ({ row }) => {
-      return (
+    {
+      accessorKey: "salaryStart",
+      header: "Salary Range",
+      cell: ({ row }) => (
+        <span>${row.original.salaryStart.toLocaleString()} - ${row.original.salaryEnd.toLocaleString()}</span>
+      ),
+    },
+    {
+      accessorKey: "createdAt",
+      header: "Created At",
+      cell: ({ row }) => {
+        const date = new Date(row.original.createdAt)
+        return date.toLocaleDateString()
+      },
+    },
+    {
+      accessorKey: "link",
+      header: "Link",
+      cell: ({ row }) => (
         <a
-          href={row.original.formLink}
+          href={row.original.link}
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-600 underline"
         >
           Apply Here
         </a>
-      )
+      ),
     },
-  },
-  {
-    accessorKey: "actions",
-    header: "Actions",
-    cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
+    {
+      accessorKey: "isActive",
+      header: "Status",
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? "default" : "secondary"} className={row.original.isActive ? "bg-green-100 text-green-800 hover:bg-green-100/80" : "bg-red-100 text-red-800 hover:bg-red-100/80"}>
+          {row.original.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
     },
-    enableHiding: false,
-  }
-]
-
-function TableRowComponent({ row }: { row: Row<z.infer<typeof schema>> }) {
-  return (
-    <TableRow data-state={row.getIsSelected() && "selected"}>
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
-    </TableRow>
-  )
-}
-
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
-  const [data, setData] = React.useState(() => initialData)
-
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  });
+    {
+      id: "actions",
+      header: () => <div className="text-center">Actions</div>,
+      cell: ({ row }) => (
+        <div className="justify-center flex items-center gap-2">
+          <Switch
+            checked={row.original.isActive}
+            disabled={isLoading}
+            onCheckedChange={(checked) => {
+              updateStatus(row.original._id, checked)
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground bg-gray-200/50 hover:bg-gray-200/70"
+            aria-label="Edit"
+            onClick={() => onEdit && onEdit(row.original)}
+          >
+            <IconEdit />
+            <span className="sr-only">Edit</span>
+          </Button>
+          <ShowSidebar item={row.original} isMobile={isMobile} />
+          <Button 
+            variant="destructive" 
+            size="icon" 
+            aria-label="Delete"
+            onClick={() => onDelete && onDelete(row.original._id)}
+          >
+            <IconTrash />
+            <span className="sr-only">Delete</span>
+          </Button>
+        </div>
+      ),
+    },
+  ]
 
   const table = useReactTable({
     data,
     columns,
-    state: {
-      pagination,
-    },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => row._id,
     enableRowSelection: true,
-    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-  });
+  })
 
-  const rowModel = table.getRowModel();
-
-  return (
-    <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader className="bg-muted sticky top-0 z-10">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                    </TableHead>
-                  )
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody className="**:data-[slot=table-cell]:first:w-8">
-            {rowModel.rows?.length ? (
-              rowModel.rows.map((row) => (
-                <TableRowComponent key={row.id} row={row} />
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex items-center justify-between px-4">
-        <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-          {table.getFilteredSelectedRowModel().rows.length} of {" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-        <div className="flex w-full items-center gap-8 lg:w-fit">
-          <div className="hidden items-center gap-2 lg:flex">
-            <Label htmlFor="rows-per-page" className="text-sm font-medium">
-              Rows per page
-            </Label>
-            <Select
-              value={`${table.getState().pagination.pageSize}`}
-              onValueChange={(value) => {
-                table.setPageSize(Number(value))
-              }}
-            >
-              <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                <SelectValue
-                  placeholder={table.getState().pagination.pageSize}
-                />
-              </SelectTrigger>
-              <SelectContent side="top">
-                {[10, 20, 30, 40, 50].map((pageSize) => (
-                  <SelectItem key={pageSize} value={`${pageSize}`}>
-                    {pageSize}
-                  </SelectItem>
+  return (<div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
+    <div className="overflow-hidden rounded-lg border">
+      <Table>
+        <TableHeader className="bg-muted sticky top-0 z-10">
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                return (
+                  <TableHead key={header.id} colSpan={header.colSpan}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                  </TableHead>
+                )
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                data-state={row.getIsSelected() && "selected"}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex w-fit items-center justify-center text-sm font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of {" "}
-            {table.getPageCount()}
-          </div>
-          <div className="ml-auto flex items-center gap-2 lg:ml-0">
-            <Button
-              variant="outline"
-              className="hidden h-8 w-8 p-0 lg:flex"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Go to first page</span>
-              <IconChevronsLeft />
-            </Button>
-            <Button
-              variant="outline"
-              className="size-8"
-              size="icon"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Go to previous page</span>
-              <IconChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              className="size-8"
-              size="icon"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Go to next page</span>
-              <IconChevronRight />
-            </Button>
-            <Button
-              variant="outline"
-              className="hidden size-8 lg:flex"
-              size="icon"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Go to last page</span>
-              <IconChevronsRight />
-            </Button>
-          </div>
-        </div>
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell
+                colSpan={columns.length}
+                className="h-24 text-center"
+              >
+                No results.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+    <div className="flex items-center justify-between px-4">
+      <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
+        {data.length || 0} rows
       </div>
     </div>
-  )
+  </div>)
 }
