@@ -1,3 +1,5 @@
+"use client"
+
 import { AppSidebar } from "@/components/app-sidebar"
 import { DataTable } from "@/components/earnings/referral-management/data-table"
 import { SectionCards } from "@/components/earnings/referral-management/section-cards"
@@ -6,20 +8,51 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-
-import data from "./data.json"
+import { useEffect, useState } from "react"
+import axiosInstance from "@/utils/axios"
 
 type ReferralRow = {
-  _id: number
-  userName: string
-  referralCode: string
-  referredUsers: number
-  totalEarnings: number
+  _id: string
+  referrerUserId: string
+  referrerName: string
+  referredUserId: string
+  referredUserName: string
+  pointsEarned: number
+  joinedAt: string
 }
 
-const typedData = data as unknown as ReferralRow[]
+type ApiResponse = {
+  code: number
+  message: string
+  data?: ReferralRow[]
+}
 
 export default function Page() {
+  const [data, setData] = useState<ReferralRow[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchReferralHistory = async () => {
+      try {
+        setLoading(true)
+        const response = await axiosInstance.post<ApiResponse>('earn/get-referral-history')
+
+        if (response.data.code === 1) {
+          setData(response.data.data || [])
+        } else {
+          setData([])
+        }
+      } catch (error) {
+        console.error('Error fetching referral history:', error)
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchReferralHistory()
+  }, [])
+
   return (
     <SidebarProvider
       style={
@@ -36,7 +69,7 @@ export default function Page() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <SectionCards />
-              <DataTable data={typedData} />
+              <DataTable data={data} loading={loading} />
             </div>
           </div>
         </div>

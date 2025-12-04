@@ -6,9 +6,6 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCheck,
-  IconX,
-  IconCoins
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -20,7 +17,6 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { z } from "zod"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
@@ -38,64 +34,69 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import ShowSidebar from "@/components/users/show-sidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export const schema = z.object({
-  id: z.number(),
+  _id: z.string(),
+  userId: z.string(),
   userName: z.string(),
-  datetime: z.string(),
-  taskComplete: z.number(),
-  points: z.number(),
+  pointsEarned: z.number(),
+  completedAt: z.string(),
 });
+
+function UserNameCell({ userId, userName }: { userId: string; userName: string }) {
+  const isMobile = useIsMobile()
+  
+  return (
+    <ShowSidebar userId={userId} isMobile={isMobile} fallbackName={userName} />
+  )
+}
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => {
-      return row.original.id
-    },
+    id: "rowNumber",
+    header: "#",
+    cell: ({ row }) => row.index + 1,
     enableHiding: false,
   },
   {
     accessorKey: "userName",
     header: "User name",
-    cell: ({ row }) => row.original.userName,
+    cell: ({ row }) => (
+      <UserNameCell userId={row.original.userId} userName={row.original.userName} />
+    ),
     enableHiding: false,
   },
   {
-    accessorKey: "datetime",
+    accessorKey: "completedAt",
     header: "Date",
     cell: ({ row }) => {
       const formatter = new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
       })
-      return formatter.format(new Date(row.original.datetime))
+      return formatter.format(new Date(row.original.completedAt))
     },
   },
   {
-    accessorKey: "taskComplete",
-    header: () => <div className="text-center">Completed Tasks</div>,
-    cell: ({ row }) => <p className="text-center">{row.original.taskComplete}</p>,
-  },
-  {
-    accessorKey: "points",
+    accessorKey: "pointsEarned",
     header: () => <div className="text-center">Points Earned</div>,
-    cell: ({ row }) => <p className="text-center">{row.original.points}</p>,
+    cell: ({ row }) => <p className="text-center">{row.original.pointsEarned}</p>,
   },
 ]
 
 export function DataTable({
   data: initialData,
+  loading = false,
 }: {
   data: z.infer<typeof schema>[]
+  loading?: boolean
 }) {
   const [data, setData] = React.useState(() => initialData)
+
+  React.useEffect(() => {
+    setData(initialData)
+  }, [initialData])
 
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -106,10 +107,6 @@ export function DataTable({
     pageSize: 10,
   })
 
-  const [tabValue, setTabValue] = React.useState<"all" | "pending" | "approved" | "rejected">(
-    "all"
-  )
-
   const table = useReactTable({
     data,
     columns,
@@ -117,7 +114,7 @@ export function DataTable({
       columnFilters,
       pagination,
     },
-    getRowId: (row) => row.id.toString(),
+    getRowId: (row) => row._id,
     enableRowSelection: true,
     onColumnFiltersChange: setColumnFilters,
     onPaginationChange: setPagination,
@@ -128,7 +125,7 @@ export function DataTable({
 
   const rowModel = table.getRowModel()
 
-  const renderTable = () => (
+  return (
     <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
       <div className="overflow-hidden rounded-lg border">
 
@@ -152,7 +149,16 @@ export function DataTable({
             ))}
           </TableHeader>
           <TableBody className="**:data-[slot=table-cell]:first:w-8">
-            {rowModel.rows?.length ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : rowModel.rows?.length ? (
               rowModel.rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -256,26 +262,5 @@ export function DataTable({
         </div>
       </div>
     </div>
-  )
-
-  return (
-    <Tabs
-      value={tabValue}
-      onValueChange={(value) => setTabValue(value as typeof tabValue)}
-      className="w-full flex-col justify-start gap-6"
-    >
-
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <Label htmlFor="status-selector" className="sr-only">
-          Status
-        </Label>
-        <div className="items-center gap-2">
-          <p className="flex text-green-700 border-green-300">
-            Point Value is &nbsp;<IconCoins />1 = &#8377;0.50
-          </p>
-        </div>
-      </div>
-      {renderTable()}
-    </Tabs>
   )
 }

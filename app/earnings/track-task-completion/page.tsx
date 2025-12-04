@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { DataTable } from "@/components/earnings/track-task-completion/data-table"
 import { SectionCards } from "@/components/earnings/track-task-completion/section-cards"
@@ -6,20 +9,48 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-
-import data from "./data.json"
+import axiosInstance from "@/utils/axios"
 
 type TaskComplete = {
-  id: number
+  _id: string
+  userId: string
   userName: string
-  datetime: string
-  taskComplete: number
-  points: number
+  pointsEarned: number
+  completedAt: string
 }
 
-const typedData = data as TaskComplete[]
+type ApiResponse = {
+  code: number
+  message: string
+  data?: TaskComplete[]
+}
 
 export default function Page() {
+  const [data, setData] = useState<TaskComplete[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        const response = await axiosInstance.post<ApiResponse>('/earn/get-task-completion-history')
+        const responseData = response.data as ApiResponse
+        
+        if (responseData.code === 1 && responseData.data) {
+          setData(responseData.data)
+        } else if (responseData.code === 2) {
+          setData([])
+        }
+      } catch (error: any) {
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
   return (
     <SidebarProvider
       style={
@@ -36,7 +67,7 @@ export default function Page() {
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <SectionCards />
-              <DataTable data={typedData} />
+              <DataTable data={data} loading={loading} />
             </div>
           </div>
         </div>

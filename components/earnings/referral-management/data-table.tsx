@@ -17,59 +17,83 @@ import {
 } from "@/components/ui/table"
 
 import { IconCoins } from "@tabler/icons-react"
+import ShowSidebar from "@/components/users/show-sidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export const schema = z.object({
-  _id: z.number(),
-  userName: z.string(),
-  referralCode: z.string(),
-  referredUsers: z.number(),
-  totalEarnings: z.number(),
+  _id: z.string(),
+  referrerUserId: z.string(),
+  referrerName: z.string(),
+  referredUserId: z.string(),
+  referredUserName: z.string(),
+  pointsEarned: z.number(),
+  joinedAt: z.string(),
 })
+
+function ReferrerNameCell({ userId, userName }: { userId: string; userName: string }) {
+  const isMobile = useIsMobile()
+
+  return (
+    <ShowSidebar userId={userId} isMobile={isMobile} fallbackName={userName} />
+  )
+}
+
+function ReferredUserNameCell({ userId, userName }: { userId: string; userName: string }) {
+  const isMobile = useIsMobile()
+
+  return (
+    <ShowSidebar userId={userId} isMobile={isMobile} fallbackName={userName} />
+  )
+}
 
 const columns: ColumnDef<z.infer<typeof schema>>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => {
-      return row.original._id
-    },
+    id: "rowNumber",
+    header: "#",
+    cell: ({ row }) => row.index + 1,
     enableHiding: false,
   },
   {
-    accessorKey: "userName",
-    header: "User name",
-    cell: ({ row }) => row.original.userName,
+    accessorKey: "referrerName",
+    header: "Referrer Name",
+    cell: ({ row }) => (
+      <ReferrerNameCell userId={row.original.referrerUserId} userName={row.original.referrerName} />
+    ),
     enableHiding: false,
   },
   {
-    accessorKey: "referralCode",
-    header: "Referral Code",
-    cell: ({ row }) => row.original.referralCode,
+    accessorKey: "referredUserName",
+    header: "Referred User Name",
+    cell: ({ row }) => (
+      <ReferredUserNameCell userId={row.original.referredUserId} userName={row.original.referredUserName} />
+    ),
     enableHiding: false,
   },
   {
-    accessorKey: "referredUsers",
-    header: "Referred Users",
-    cell: ({ row }) => row.original.referredUsers,
+    accessorKey: "pointsEarned",
+    header: "Points Earned",
+    cell: ({ row }) => row.original.pointsEarned,
     enableHiding: false,
   },
   {
-    accessorKey: "totalEarnings",
-    header: "Total Earnings",
-    cell: ({ row }) => row.original.totalEarnings,
+    accessorKey: "joinedAt",
+    header: "Joined At",
+    cell: ({ row }) => row.original.joinedAt,
   },
 ]
 
 export function DataTable({
   data,
+  loading = false,
 }: {
   data: z.infer<typeof schema>[]
+  loading?: boolean
 }) {
 
   const table = useReactTable({
     data,
     columns,
-    getRowId: row => row._id.toString(),
+    getRowId: row => row._id,
     enableRowSelection: true,
     getCoreRowModel: getCoreRowModel(),
   })
@@ -79,10 +103,10 @@ export function DataTable({
   return (
     <div className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
       <div className="items-center gap-2">
-          <p className="flex text-green-700 border-green-300">
-            Point Value is &nbsp;<IconCoins />1 = &#8377;0.50
-          </p>
-        </div>
+        <p className="flex text-green-700 border-green-300">
+          Point Value is &nbsp;<IconCoins />1 = &#8377;0.50
+        </p>
+      </div>
       <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader className="bg-muted sticky top-0 z-10">
@@ -104,7 +128,16 @@ export function DataTable({
             ))}
           </TableHeader>
           <TableBody>
-            {rowModel.rows?.length ? (
+            {loading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : rowModel.rows?.length ? (
               rowModel.rows.map(row => (
                 <TableRow
                   key={row.id}
